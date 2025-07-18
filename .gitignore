@@ -1,0 +1,253 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Build output directory
+bin/
+build/
+dist/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node_modules (if using any Node.js tools)
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Config files with sensitive information
+config.local.yaml
+config.prod.yaml
+config.production.yaml
+*.secret.yaml
+secrets/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Compiled Object files
+*.o
+*.a
+
+# Debug files
+debug
+*.debug
+
+# Profiling files
+*.prof
+*.pprof
+
+# Test coverage files
+coverage.html
+coverage.out
+coverage.xml
+
+# Air live reload tool
+.air.toml
+tmp/
+
+# Delve debugger binary
+__debug_bin
+
+# GoReleaser files
+.goreleaser.yml
+dist/
+
+# Docker files (if you want to ignore specific Docker files)
+# Dockerfile.local
+# docker-compose.override.yml
+
+# Kubernetes local config
+*.kubeconfig
+
+# Helm charts (if using Helm)
+charts/*/charts
+charts/*/requirements.lock
+
+# Terraform files (if using Terraform for infrastructure)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Local development certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Generated documentation
+docs/build/
+site/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# Eclipse IDE
+.project
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Project specific ignores
+# Add any project-specific files or directories you want to ignore
+config.yaml
+!configs/config.yaml
+!configs/config.dev.yaml
+
+# Ignore any local override configs
+configs/config.local.yaml
+configs/config.override.yaml
+
+# Ignore generated files
+*_gen.go
+*.pb.go
+
+# Ignore vendored dependencies if not using vendor directory
+# Uncomment the next line if you're not committing vendor directory
+# vendor/ 

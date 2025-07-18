@@ -1,0 +1,36 @@
+# Ops MCP Server Configuration
+# This configuration file provides settings for the modular MCP server
+
+# Logging configuration
+log_level: info
+
+# Server configuration
+server:
+  host: 0.0.0.0
+  port: 3000
+  mode: stdio  # Server mode: "stdio" or "sse"
+
+# Module configurations
+# Each module can be enabled/disabled and configured independently
+
+# Events module - provides event querying capabilities
+events:
+  enabled: true
+  endpoint: "http://localhost:8080/api/events"
+
+# Metrics module - provides metrics monitoring capabilities  
+metrics:
+  enabled: false
+
+# Logs module - provides log analysis capabilities
+logs:
+  enabled: false
+
+# Legacy SSE configuration (not used in MCP stdio mode)
+sse:
+  keepAlive: 30s
+  maxConnections: 1000
+
+# Authentication configuration (placeholder)
+auth:
+  enabled: false
