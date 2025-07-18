@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -44,7 +46,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("enable-logs", false, "Enable logs module")
 
 	// Bind flags to viper with unique keys
-	viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
+	viper.BindPFlag("log.level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.BindPFlag("server.host", rootCmd.PersistentFlags().Lookup("host"))
 	viper.BindPFlag("server.port", rootCmd.PersistentFlags().Lookup("port"))
 	viper.BindPFlag("server.mode", rootCmd.PersistentFlags().Lookup("mode"))
@@ -54,6 +56,18 @@ func init() {
 }
 
 func initConfig() {
+	// Enable automatic environment variable support first
+	viper.AutomaticEnv()
+
+	// Set environment variable key mapping for nested config
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Set up specific environment variable mappings
+	viper.BindEnv("log.level", "LOG_LEVEL")
+	viper.BindEnv("server.host", "SERVER_HOST")
+	viper.BindEnv("server.port", "SERVER_PORT")
+
+	// Load main config file first
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -63,15 +77,16 @@ func initConfig() {
 		viper.SetConfigType("yaml")
 	}
 
-	viper.AutomaticEnv()
-
+	// Try to read config file
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("Warning: Could not read config file: %v", err)
+	} else {
+		log.Printf("Using config file: %s", viper.ConfigFileUsed())
 	}
 
 	// Initialize logger
 	var err error
-	logLevel := viper.GetString("log_level")
+	logLevel := viper.GetString("log.level")
 	switch logLevel {
 	case "debug":
 		logger, err = zap.NewDevelopment()
@@ -92,14 +107,14 @@ func runServer(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to unmarshal config", zap.Error(err))
 	}
 
-	// Override module enablement with CLI flags if provided
-	if viper.IsSet("cli.events.enabled") {
+	// Override module enablement with CLI flags if provided (only if explicitly set by user)
+	if cmd.Flags().Changed("enable-events") {
 		cfg.Events.Enabled = viper.GetBool("cli.events.enabled")
 	}
-	if viper.IsSet("cli.metrics.enabled") {
+	if cmd.Flags().Changed("enable-metrics") {
 		cfg.Metrics.Enabled = viper.GetBool("cli.metrics.enabled")
 	}
-	if viper.IsSet("cli.logs.enabled") {
+	if cmd.Flags().Changed("enable-logs") {
 		cfg.Logs.Enabled = viper.GetBool("cli.logs.enabled")
 	}
 
@@ -113,6 +128,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	logger.Info("Starting Ops MCP Server",
+		zap.String("log_level", cfg.Log.Level),
 		zap.String("mode", serverMode),
 		zap.String("host", cfg.Server.Host),
 		zap.Int("port", cfg.Server.Port),
@@ -128,7 +144,18 @@ func runServer(cmd *cobra.Command, args []string) {
 	var toolCount int
 
 	if cfg.Events.Enabled {
-		eventsTools := eventsModule.GetTools()
+		// Create events module instance with configuration
+		eventsConfig := &eventsModule.Config{
+			Endpoint:     cfg.Events.Endpoint,
+			Token:        cfg.Events.Token,
+			PollInterval: 30 * time.Second, // default poll interval
+		}
+		eventsModuleInstance, err := eventsModule.New(eventsConfig, logger)
+		if err != nil {
+			logger.Fatal("Failed to create events module", zap.Error(err))
+		}
+
+		eventsTools := eventsModuleInstance.GetTools()
 		for _, serverTool := range eventsTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			toolCount++

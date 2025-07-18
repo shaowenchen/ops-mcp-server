@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-mcp-server
+  labels:
+    app: ops-mcp-server
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: ops-mcp-server
+  template:
+    metadata:
+      labels:
+        app: ops-mcp-server
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: ops-mcp-server
+          image: shaowenchen/ops-mcp-server:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: health
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: OPS_MCP_ENV
+              value: "production"
+            - name: OPS_MCP_LOG_LEVEL
+              value: "info"
+            - name: OPS_MCP_SERVER_HOST
+              value: "0.0.0.0"
+            - name: OPS_MCP_SERVER_PORT
+              value: "3000"
+            - name: EVENTS_ENDPOINT
+              value: "http://localhost:3000/api/v1/events"
+          args:
+            - "--config"
+            - "/app/config/config.yaml"
+            - "--enable-events"
+            - "--enable-metrics"
+            - "--enable-logs"
+            - "--mode"
+            - "sse"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config-volume
+          configMap:
+            name: ops-mcp-server-config
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

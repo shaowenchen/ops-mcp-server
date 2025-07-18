@@ -4,13 +4,18 @@ import "time"
 
 // Config represents the complete server configuration
 type Config struct {
-	LogLevel string        `mapstructure:"log_level" json:"log_level" yaml:"log_level"`
-	Server   ServerConfig  `mapstructure:"server" json:"server" yaml:"server"`
-	Events   EventsConfig  `mapstructure:"events" json:"events" yaml:"events"`
-	Metrics  MetricsConfig `mapstructure:"metrics" json:"metrics" yaml:"metrics"`
-	Logs     LogsConfig    `mapstructure:"logs" json:"logs" yaml:"logs"`
-	SSE      SSEConfig     `mapstructure:"sse" json:"sse" yaml:"sse"`
-	Auth     AuthConfig    `mapstructure:"auth" json:"auth" yaml:"auth"`
+	Log     LogConfig     `mapstructure:"log" json:"log" yaml:"log"`
+	Server  ServerConfig  `mapstructure:"server" json:"server" yaml:"server"`
+	Events  EventsConfig  `mapstructure:"events" json:"events" yaml:"events"`
+	Metrics MetricsConfig `mapstructure:"metrics" json:"metrics" yaml:"metrics"`
+	Logs    LogsConfig    `mapstructure:"logs" json:"logs" yaml:"logs"`
+	SSE     SSEConfig     `mapstructure:"sse" json:"sse" yaml:"sse"`
+	Auth    AuthConfig    `mapstructure:"auth" json:"auth" yaml:"auth"`
+}
+
+// LogConfig contains logging configuration
+type LogConfig struct {
+	Level string `mapstructure:"level" json:"level" yaml:"level"`
 }
 
 // ServerConfig contains server configuration
@@ -24,6 +29,7 @@ type ServerConfig struct {
 type EventsConfig struct {
 	Enabled  bool   `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
 	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Token    string `mapstructure:"token" json:"token" yaml:"token"`
 }
 
 // MetricsConfig contains metrics module configuration

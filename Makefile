@@ -196,4 +196,36 @@ help:
 	@echo "  docker-push  - Push Docker image"
 	@echo "  quick        - Quick development cycle (fmt, lint, test, build)"
 	@echo "  dev-setup    - Setup development environment"
-	@echo "  help         - Show this help" 
+	@echo ""
+	@echo "Kubernetes deployment targets:"
+	@echo "  k8s-deploy   - Deploy to Kubernetes"
+	@echo "  k8s-status   - Show Kubernetes deployment status"
+	@echo "  k8s-cleanup  - Clean up Kubernetes resources"
+	@echo "  k8s-logs     - Show application logs"
+	@echo "  help         - Show this help"
+
+# Kubernetes deployment targets
+.PHONY: k8s-deploy
+k8s-deploy:
+	@echo "Deploying to Kubernetes..."
+	chmod +x deploy/deploy.sh
+	./deploy/deploy.sh deploy
+
+.PHONY: k8s-status
+k8s-status:
+	@echo "Checking Kubernetes deployment status..."
+	./deploy/deploy.sh status
+
+.PHONY: k8s-cleanup
+k8s-cleanup:
+	@echo "Cleaning up Kubernetes resources..."
+	./deploy/deploy.sh cleanup
+
+.PHONY: k8s-logs
+k8s-logs:
+	@echo "Showing application logs..."
+	kubectl logs -l app=ops-mcp-server -n ops-mcp-server --tail=100 -f
+
+.PHONY: k8s-build-deploy
+k8s-build-deploy: docker-build docker-push k8s-deploy
+	@echo "Complete build and deploy cycle finished" 

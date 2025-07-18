@@ -1,9 +1,12 @@
 package events
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -15,13 +18,15 @@ import (
 // Config contains events module configuration
 type Config struct {
 	Endpoint     string        `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Token        string        `mapstructure:"token" json:"token" yaml:"token"`
 	PollInterval time.Duration `mapstructure:"pollInterval" json:"pollInterval" yaml:"pollInterval"`
 }
 
 // Module represents the events module
 type Module struct {
-	config *Config
-	logger *zap.Logger
+	config     *Config
+	logger     *zap.Logger
+	httpClient *http.Client
 }
 
 // New creates a new events module
@@ -33,162 +38,380 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 	m := &Module{
 		config: config,
 		logger: logger.Named("events"),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 
 	m.logger.Info("Events module created",
 		zap.String("endpoint", config.Endpoint),
 		zap.Duration("pollInterval", config.PollInterval),
+		zap.Bool("token_configured", config.Token != ""),
 	)
 
 	return m, nil
 }
 
-// GetTools returns all MCP tools for the events module
-func GetTools() []server.ServerTool {
+// makeRequest creates and executes an HTTP request with authentication (legacy method with path)
+func (m *Module) makeRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
+	url := m.config.Endpoint + path
+	return m.makeRequestWithFullURL(ctx, method, url, body)
+}
+
+// makeRequestWithFullURL creates and executes an HTTP request with authentication using full URL
+func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonData, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonData)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	// Add Authorization header if token is configured
+	if m.config.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+m.config.Token)
+	}
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	return resp, nil
+}
+
+// enhanceEvent adds parsed information to an event
+func enhanceEvent(wrapper EventWrapper) EnhancedEvent {
+	enhanced := EnhancedEvent{
+		EventWrapper: wrapper,
+		ParsedInfo:   ParseSubject(wrapper.Subject),
+	}
+
+	// If cluster is not set in parsed info, try to get it from the event
+	if enhanced.ParsedInfo.Cluster == "" && wrapper.Event.Cluster != "" {
+		enhanced.ParsedInfo.Cluster = wrapper.Event.Cluster
+	}
+
+	return enhanced
+}
+
+// buildSubjectPattern builds the subject pattern for the API path
+func (m *Module) buildSubjectPattern(req EventsListRequest) string {
+	// Build subject pattern based on resource type and filters
+	// Format: ops.clusters.{cluster}.{resource_path}.event
+	// For pods/deployments: ops.clusters.{cluster}.namespaces.{namespace}.{resource}.{name}.event
+	// For nodes: ops.clusters.{cluster}.nodes.{name}.event
+	// Use * as wildcard when specific names are not provided
+
+	var subjectPattern string
+
+	if req.Resource == "nodes" {
+		// Nodes pattern: ops.clusters.{cluster}.nodes.{name}.event
+		clusterPart := "*"
+		if req.Cluster != "" {
+			clusterPart = req.Cluster
+		}
+
+		nodePart := "*"
+		if req.ResourceName != "" {
+			nodePart = req.ResourceName
+		}
+
+		subjectPattern = fmt.Sprintf("ops.clusters.%s.nodes.%s.event", clusterPart, nodePart)
+	} else {
+		// Namespaced resources pattern: ops.clusters.{cluster}.namespaces.{namespace}.{resource}.{name}.event
+		clusterPart := "*"
+		if req.Cluster != "" {
+			clusterPart = req.Cluster
+		}
+
+		namespacePart := "*"
+		if req.Namespace != "" {
+			namespacePart = req.Namespace
+		}
+
+		resourcePart := "*"
+		if req.Resource != "" {
+			resourcePart = req.Resource
+		}
+
+		resourceNamePart := "*"
+		if req.ResourceName != "" {
+			resourceNamePart = req.ResourceName
+		}
+
+		subjectPattern = fmt.Sprintf("ops.clusters.%s.namespaces.%s.%s.%s.event",
+			clusterPart, namespacePart, resourcePart, resourceNamePart)
+	}
+
+	return subjectPattern
+}
+
+// fetchEventsFromAPI fetches events from the configured endpoint
+func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) (*EventsListResponse, error) {
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("events endpoint not configured")
+	}
+
+	// Build subject pattern for the API path
+	subjectPattern := m.buildSubjectPattern(req)
+
+	// Build query parameters
+	queryParams := make(map[string]string)
+	if req.Limit > 0 {
+		queryParams["page_size"] = strconv.Itoa(req.Limit)
+	} else {
+		queryParams["page_size"] = "10"
+	}
+
+	page := 1
+	if req.Offset > 0 && req.Limit > 0 {
+		page = (req.Offset / req.Limit) + 1
+	}
+	queryParams["page"] = strconv.Itoa(page)
+
+	if req.StartTime != "" {
+		queryParams["start_time"] = req.StartTime
+	}
+
+	// Build full URL with path and query parameters
+	// Format: {endpoint}/{subject_pattern}?query_params
+	url := m.config.Endpoint + "/" + subjectPattern
+	if len(queryParams) > 0 {
+		url += "?"
+		first := true
+		for key, value := range queryParams {
+			if !first {
+				url += "&"
+			}
+			url += key + "=" + value
+			first = false
+		}
+	}
+
+	m.logger.Info("🌐 Making API Request",
+		zap.String("full_url", url),
+		zap.String("base_endpoint", m.config.Endpoint),
+		zap.String("subject_pattern", subjectPattern),
+		zap.Any("query_params", queryParams),
+		zap.String("resource_type", req.Resource),
+		zap.String("cluster", req.Cluster),
+		zap.String("namespace", req.Namespace),
+		zap.Int("limit", req.Limit),
+		zap.Int("offset", req.Offset),
+		zap.String("start_time", req.StartTime))
+
+	// Also print to console for visibility
+	fmt.Printf("🎯 Subject Pattern: %s\n", subjectPattern)
+	fmt.Printf("🔍 Full API Query URL: %s\n", url)
+
+	resp, err := m.makeRequestWithFullURL(ctx, "GET", url, nil)
+	if err != nil {
+		m.logger.Error("Failed to fetch events from API", zap.Error(err))
+		return nil, fmt.Errorf("failed to call events API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		m.logger.Error("API returned non-OK status",
+			zap.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var eventsResp EventsListResponse
+	if err := json.Unmarshal(body, &eventsResp); err != nil {
+		m.logger.Error("Failed to decode API response",
+			zap.Error(err),
+			zap.String("body", string(body)))
+		return nil, fmt.Errorf("failed to decode API response: %w", err)
+	}
+
+	// Enhance all events with parsed information
+	for i := range eventsResp.Data.List {
+		eventsResp.Data.List[i] = enhanceEvent(eventsResp.Data.List[i].EventWrapper)
+	}
+
+	m.logger.Info("Successfully fetched events",
+		zap.Int("count", len(eventsResp.Data.List)),
+		zap.Int("total", eventsResp.Data.Total))
+
+	return &eventsResp, nil
+}
+
+// GetTools returns MCP tools for events (pods, deployments, nodes, etc.)
+func (m *Module) GetTools() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool:    listEventsToolDefinition(),
-			Handler: handleListEvents,
+			Tool:    getPodEventsToolDefinition(),
+			Handler: m.handleGetPodEvents,
 		},
 		{
-			Tool:    getEventToolDefinition(),
-			Handler: handleGetEvent,
+			Tool:    getDeploymentEventsToolDefinition(),
+			Handler: m.handleGetDeploymentEvents,
 		},
 		{
-			Tool:    getEventTypesToolDefinition(),
-			Handler: handleGetEventTypes,
-		},
-		{
-			Tool:    getEventServicesToolDefinition(),
-			Handler: handleGetEventServices,
-		},
-		{
-			Tool:    getEventStatsToolDefinition(),
-			Handler: handleGetEventStats,
-		},
-		{
-			Tool:    createEventToolDefinition(),
-			Handler: handleCreateEvent,
+			Tool:    getNodesEventsToolDefinition(),
+			Handler: m.handleGetNodesEvents,
 		},
 	}
 }
 
 // Tool definitions
-func listEventsToolDefinition() mcp.Tool {
-	return mcp.NewTool("list_events",
-		mcp.WithDescription("List operational events with optional filtering and pagination"),
-		mcp.WithString("event_type", mcp.Description("Filter by event type (deployment, alert, scaling, etc.)")),
-		mcp.WithString("service", mcp.Description("Filter by service name")),
-		mcp.WithString("status", mcp.Description("Filter by status (success, warning, error, in_progress)")),
+func getPodEventsToolDefinition() mcp.Tool {
+	return mcp.NewTool("get_pod_events",
+		mcp.WithDescription("Get Kubernetes pod events from all pods in specified namespace/cluster. Returns events with pod names in parsed_info.name field. No need to specify individual pod names."),
+		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
+		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
+		mcp.WithString("pod", mcp.Description("Specific pod name to query (optional - if not provided, shows all pods)")),
 		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
 		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
+		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
 	)
 }
 
-func getEventToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_event",
-		mcp.WithDescription("Get detailed information about a specific event"),
-		mcp.WithString("event_id", mcp.Required(), mcp.Description("Unique identifier of the event")),
+func getDeploymentEventsToolDefinition() mcp.Tool {
+	return mcp.NewTool("get_deployment_events",
+		mcp.WithDescription("Get Kubernetes deployment events from all deployments in specified namespace/cluster. Returns events with deployment names in parsed_info.name field. No need to specify individual deployment names."),
+		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
+		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
+		mcp.WithString("deployment", mcp.Description("Specific deployment name to query (optional - if not provided, shows all deployments)")),
+		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
+		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
+		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
 	)
 }
 
-func getEventTypesToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_event_types",
-		mcp.WithDescription("Get all available event types"),
-	)
-}
-
-func getEventServicesToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_event_services",
-		mcp.WithDescription("Get all services that have events"),
-	)
-}
-
-func getEventStatsToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_event_stats",
-		mcp.WithDescription("Get event statistics and summaries"),
-		mcp.WithString("time_range", mcp.Description("Time range for statistics (1h, 24h, 7d, 30d)")),
-	)
-}
-
-func createEventToolDefinition() mcp.Tool {
-	return mcp.NewTool("create_event",
-		mcp.WithDescription("Create a new event for testing purposes"),
-		mcp.WithString("type", mcp.Required(), mcp.Description("Event type")),
-		mcp.WithString("service", mcp.Required(), mcp.Description("Service name")),
-		mcp.WithString("message", mcp.Required(), mcp.Description("Event message")),
+func getNodesEventsToolDefinition() mcp.Tool {
+	return mcp.NewTool("get_nodes_events",
+		mcp.WithDescription("Get Kubernetes node events from all nodes in specified cluster. Returns events with node names in parsed_info.name field. No need to specify individual node names."),
+		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional - if not provided, shows all clusters)")),
+		mcp.WithString("node", mcp.Description("Specific node name to query (optional - if not provided, shows all nodes)")),
+		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
+		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
+		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
 	)
 }
 
 // Tool handlers
-func handleListEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (m *Module) handleGetPodEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return m.handleEvents(ctx, request, "pods")
+}
+
+func (m *Module) handleGetDeploymentEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return m.handleEvents(ctx, request, "deployments")
+}
+
+func (m *Module) handleGetNodesEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return m.handleEvents(ctx, request, "nodes")
+}
+
+// Common handler for events (Kubernetes and other types)
+func (m *Module) handleEvents(ctx context.Context, request mcp.CallToolRequest, resourceType string) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
 
-	// Parse parameters
-	var eventType, service, status string
+	// Log incoming request
+	fmt.Printf("📥 Received %s events request with args: %+v\n", resourceType, args)
+	m.logger.Info("Processing events request",
+		zap.String("resource_type", resourceType),
+		zap.Any("arguments", args))
+
+	// Parse parameters for events
+	var cluster, namespace, resourceName, startTime string
 	var limit, offset int = 10, 0
 
-	if val, ok := args["event_type"].(string); ok {
-		eventType = val
+	if val, ok := args["cluster"].(string); ok {
+		cluster = val
 	}
-	if val, ok := args["service"].(string); ok {
-		service = val
+	// Only parse namespace for resources that support it (not for nodes)
+	if resourceType != "nodes" {
+		if val, ok := args["namespace"].(string); ok {
+			namespace = val
+		}
+		// Parse pod for pods
+		if resourceType == "pods" {
+			if val, ok := args["pod"].(string); ok {
+				resourceName = val
+			}
+		}
+		// Parse deployment for deployments
+		if resourceType == "deployments" {
+			if val, ok := args["deployment"].(string); ok {
+				resourceName = val
+			}
+		}
+	} else {
+		// Parse node for nodes
+		if val, ok := args["node"].(string); ok {
+			resourceName = val
+		}
 	}
-	if val, ok := args["status"].(string); ok {
-		status = val
+	if val, ok := args["start_time"].(string); ok {
+		startTime = val
+	} else {
+		// Default: 30 minutes ago
+		defaultTime := time.Now().Add(-30 * time.Minute)
+		startTime = strconv.FormatInt(defaultTime.UnixMilli(), 10)
 	}
 	if val, ok := args["limit"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
 	if val, ok := args["offset"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
 
-	// Generate mock events
-	events := generateMockEvents()
-
-	// Apply filters
-	filtered := make([]Event, 0)
-	for _, event := range events {
-		if eventType != "" && event.Type != eventType {
-			continue
-		}
-		if service != "" && event.Service != service {
-			continue
-		}
-		if status != "" && event.Status != status {
-			continue
-		}
-		filtered = append(filtered, event)
+	// Create request for events API
+	req := EventsListRequest{
+		Limit:        limit,
+		Offset:       offset,
+		Cluster:      cluster,
+		Namespace:    namespace, // Will be empty for nodes, which is correct
+		Resource:     resourceType,
+		ResourceName: resourceName, // Specific resource name if provided
+		StartTime:    startTime,
 	}
 
-	// Apply pagination
-	total := len(filtered)
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
+	// Fetch events
+	response, err := m.fetchEventsFromAPI(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s events: %w", resourceType, err)
 	}
 
-	result := filtered[start:end]
+	// Log response summary and show sample parsing
+	fmt.Printf("✅ Successfully fetched %d %s events (total available: %d)\n",
+		len(response.Data.List), resourceType, response.Data.Total)
 
-	response := map[string]interface{}{
-		"events": result,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
+	if len(response.Data.List) > 0 {
+		sample := response.Data.List[0]
+		fmt.Printf("📋 Sample event - Subject: %s\n", sample.Subject)
+		fmt.Printf("🔍 Parsed info - Cluster: %s, Namespace: %s, Resource: %s, Name: %s\n",
+			sample.ParsedInfo.Cluster, sample.ParsedInfo.Namespace,
+			sample.ParsedInfo.Resource, sample.ParsedInfo.Name)
 	}
 
 	data, err := json.Marshal(response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
 	return &mcp.CallToolResult{
@@ -199,264 +422,4 @@ func handleListEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 			},
 		},
 	}, nil
-}
-
-func handleGetEvent(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-
-	eventID, ok := args["event_id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("event_id is required")
-	}
-
-	// Generate mock event
-	event := Event{
-		ID:        eventID,
-		Type:      "deployment",
-		Service:   "api-gateway",
-		Timestamp: time.Now(),
-		Status:    "success",
-		Message:   "Deployment completed successfully",
-		Details: map[string]interface{}{
-			"version":     "v1.2.3",
-			"duration":    "45s",
-			"user":        "admin",
-			"environment": "production",
-		},
-	}
-
-	data, err := json.Marshal(event)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func handleGetEventTypes(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	types := []string{
-		"deployment",
-		"alert",
-		"scaling",
-		"maintenance",
-		"backup",
-		"security",
-		"configuration",
-	}
-
-	response := map[string]interface{}{
-		"event_types": types,
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func handleGetEventServices(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	services := []string{
-		"api-gateway",
-		"database",
-		"web-frontend",
-		"auth-service",
-		"payment-service",
-		"notification-service",
-	}
-
-	response := map[string]interface{}{
-		"services": services,
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func handleGetEventStats(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-	
-	timeRange := "24h"
-	if val, ok := args["time_range"].(string); ok {
-		timeRange = val
-	}
-
-	stats := map[string]interface{}{
-		"total_events": 150,
-		"by_type": map[string]int{
-			"deployment":    45,
-			"alert":         32,
-			"scaling":       28,
-			"maintenance":   20,
-			"backup":        15,
-			"security":      6,
-			"configuration": 4,
-		},
-		"by_status": map[string]int{
-			"success":     120,
-			"warning":     20,
-			"error":       8,
-			"in_progress": 2,
-		},
-		"time_range":   timeRange,
-		"generated_at": time.Now().Format(time.RFC3339),
-	}
-
-	data, err := json.Marshal(stats)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func handleCreateEvent(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-
-	eventType, ok := args["type"].(string)
-	if !ok {
-		return nil, fmt.Errorf("type is required")
-	}
-
-	service, ok := args["service"].(string)
-	if !ok {
-		return nil, fmt.Errorf("service is required")
-	}
-
-	message, ok := args["message"].(string)
-	if !ok {
-		return nil, fmt.Errorf("message is required")
-	}
-
-	event := Event{
-		ID:        fmt.Sprintf("evt_%d", time.Now().Unix()),
-		Type:      eventType,
-		Service:   service,
-		Timestamp: time.Now(),
-		Status:    "success",
-		Message:   message,
-		Details: map[string]interface{}{
-			"created_by": "mcp_tool",
-			"manual":     true,
-		},
-	}
-
-	data, err := json.Marshal(event)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-// Helper function to generate mock events
-func generateMockEvents() []Event {
-	return []Event{
-		{
-			ID:        "evt_001",
-			Type:      "deployment",
-			Service:   "api-gateway",
-			Timestamp: time.Now().Add(-10 * time.Minute),
-			Status:    "success",
-			Message:   "Deployment completed successfully",
-			Details: map[string]interface{}{
-				"version":  "v1.2.3",
-				"duration": "45s",
-				"replicas": 3,
-				"image":    "api-gateway:v1.2.3",
-			},
-		},
-		{
-			ID:        "evt_002",
-			Type:      "alert",
-			Service:   "database",
-			Timestamp: time.Now().Add(-5 * time.Minute),
-			Status:    "warning",
-			Message:   "High CPU usage detected",
-			Details: map[string]interface{}{
-				"cpu_usage": "85%",
-				"threshold": "80%",
-				"duration":  "2m",
-			},
-		},
-		{
-			ID:        "evt_003",
-			Type:      "scaling",
-			Service:   "web-frontend",
-			Timestamp: time.Now().Add(-2 * time.Minute),
-			Status:    "in_progress",
-			Message:   "Auto-scaling triggered",
-			Details: map[string]interface{}{
-				"from_replicas": 2,
-				"to_replicas":   4,
-				"trigger":       "cpu_threshold",
-			},
-		},
-		{
-			ID:        "evt_004",
-			Type:      "maintenance",
-			Service:   "database",
-			Timestamp: time.Now().Add(-30 * time.Minute),
-			Status:    "success",
-			Message:   "Scheduled maintenance completed",
-			Details: map[string]interface{}{
-				"duration":    "25m",
-				"maintenance": "index_rebuild",
-				"downtime":    "0s",
-			},
-		},
-		{
-			ID:        "evt_005",
-			Type:      "backup",
-			Service:   "database",
-			Timestamp: time.Now().Add(-60 * time.Minute),
-			Status:    "success",
-			Message:   "Database backup completed",
-			Details: map[string]interface{}{
-				"size":     "2.5GB",
-				"duration": "8m",
-				"location": "s3://backups/db",
-			},
-		},
-	}
 }

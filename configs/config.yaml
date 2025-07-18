@@ -2,7 +2,8 @@
 # This configuration file provides settings for the modular MCP server
 
 # Logging configuration
-log_level: info
+log:
+  level: info
 
 # Server configuration
 server:
@@ -16,7 +17,8 @@ server:
 # Events module - provides event querying capabilities
 events:
   enabled: true
-  endpoint: "http://localhost:8080/api/events"
+  endpoint: "http://localhost:8080/api/v1/events"
+  token: ""
 
 # Metrics module - provides metrics monitoring capabilities  
 metrics:
