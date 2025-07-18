@@ -25,12 +25,7 @@ FROM shaowenchen/runtime-ubuntu:22.04
 WORKDIR /runtime
 
 # Install ca-certificates and timezone data (using apt for Ubuntu)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    tzdata \
-    wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd -g 1000 appgroup \
+RUN groupadd -g 1000 appgroup \
     && useradd -u 1000 -g appgroup -s /bin/bash -m appuser
 
 # Copy binary from builder stage
