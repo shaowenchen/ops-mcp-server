@@ -1,19 +1,9 @@
 # Multi-stage build for optimal image size
-FROM golang:1.23-alpine AS builder
+FROM shaowenchen/builder-golang:1.23 AS builder
 
-# Install git and ca-certificates (needed for go modules)
-RUN apk add --no-cache git ca-certificates tzdata
+# Set working directory to the default workspace
+WORKDIR /builder
 
-# Set working directory
-WORKDIR /app
-
-# Copy go mod files first for better caching
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download && go mod verify
-
-# Copy source code
 COPY . .
 
 # Build arguments for multi-arch support
@@ -29,26 +19,29 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -o ops-mcp-server \
     ./cmd/server
 
-# Create final minimal image
-FROM alpine:3.18
+FROM shaowenchen/runtime-ubuntu:22.04
 
-# Install ca-certificates and timezone data
-RUN apk --no-cache add ca-certificates tzdata && \
-    addgroup -g 1000 appgroup && \
-    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+# Set working directory to the default workspace
+WORKDIR /runtime
 
-# Set working directory
-WORKDIR /app
+# Install ca-certificates and timezone data (using apt for Ubuntu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1000 appgroup \
+    && useradd -u 1000 -g appgroup -s /bin/bash -m appuser
 
 # Copy binary from builder stage
-COPY --from=builder /app/ops-mcp-server .
+COPY --from=builder /builder/ops-mcp-server .
 
 # Copy configuration files
-COPY --from=builder /app/configs ./configs
+COPY --from=builder /builder/configs ./configs
 
 # Create necessary directories and set ownership
-RUN mkdir -p /app/logs && \
-    chown -R appuser:appgroup /app
+RUN mkdir -p /runtime/logs && \
+    chown -R appuser:appgroup /runtime
 
 # Switch to non-root user
 USER appuser
@@ -72,7 +65,7 @@ CMD ["--config", "./configs/config.yaml"]
 
 # Labels for better organization
 LABEL maintainer="mail@chenshaowen.com" \
-      version="1.0.0" \
-      description="Ops MCP Server - Modular operational data querying server" \
-      org.opencontainers.image.source="https://github.com/shaowenchen/ops-mcp-server" \
-      org.opencontainers.image.documentation="https://github.com/shaowenchen/ops-mcp-server/blob/main/README.md" 
+    version="1.0.0" \
+    description="Ops MCP Server - Modular operational data querying server" \
+    org.opencontainers.image.source="https://github.com/shaowenchen/ops-mcp-server" \
+    org.opencontainers.image.documentation="https://github.com/shaowenchen/ops-mcp-server/blob/main/README.md" 
