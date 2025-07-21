@@ -1,188 +1,162 @@
 # Ops MCP Server
 
-A modular Model Context Protocol (MCP) server for operational data querying, built with Go and using the official MCP protocol implementation.
+A modular MCP (Model Context Protocol) server providing operational monitoring capabilities including events, metrics, and logs.
 
-## Overview
+## Features
 
-Ops MCP Server is a real MCP (Model Context Protocol) server that provides tools for operational data access through a standardized protocol. It uses the `github.com/mark3labs/mcp-go/server` library to provide genuine MCP protocol support via stdio communication.
+- **Events Module**: Query Kubernetes events (pods, deployments, nodes)
+- **Metrics Module**: Query monitoring metrics through Grafana/Prometheus
+- **Logs Module**: Analyze and search application logs
 
-## Available Modules and Tools
+## Metrics Module - Prometheus Integration
 
-### Events Module
-When enabled, provides these MCP tools:
-- `list_events`: List all available events with optional limit and offset
-- `get_event`: Get detailed information about a specific event by ID
+The metrics module supports querying monitoring data directly through Prometheus API, allowing you to execute Prometheus queries.
 
-### Metrics Module
-When enabled, provides these MCP tools:
-- `get_metrics_status`: Get the current status of the metrics module
+### Available Tools
 
-### Logs Module  
-When enabled, provides these MCP tools:
-- `get_logs_status`: Get the current status of the logs module
+#### Basic Query Tools
+- `query_metrics` - Execute custom PromQL queries
+- `query_metrics_range` - Execute range queries with time intervals
+- `get_metrics_status` - Get metrics module status
+- `get_system_overview` - Get system overview metrics
 
-## Installation
+#### Kubernetes Resource Discovery
+- `get_clusters` - List all available Kubernetes clusters
+- `get_namespaces` - List namespaces (optionally filtered by cluster)
+- `get_pods` - List pods (optionally filtered by cluster/namespace)
 
-### Using Docker (Recommended)
+#### Kubernetes Resource Usage
+- `get_pod_resource_usage` - Get CPU and memory usage for pods
+- `get_node_resource_usage` - Get CPU and memory usage for nodes
 
-```bash
-# Run with events module enabled
-docker run -it shaowenchen/ops-mcp-server --enable-events
+### Configuration
 
-# Run with multiple modules
-docker run -it shaowenchen/ops-mcp-server --enable-events --enable-metrics --enable-logs
+Configure Prometheus integration in `configs/config.yaml`:
 
-# Run with configuration file
-docker run -it -v $(pwd)/configs:/app/configs shaowenchen/ops-mcp-server -c /app/configs/config.yaml
+```yaml
+metrics:
+  enabled: true
+  prometheus:
+    endpoint: "http://localhost:9090/api/v1"
 ```
 
-### Using Go
+### Environment Variables
+
+Configure endpoint via environment variable if needed:
 
 ```bash
-# Install from source
-go install github.com/shaowenchen/ops-mcp-server/cmd/server@latest
-
-# Or build locally
-git clone https://github.com/shaowenchen/ops-mcp-server.git
-cd ops-mcp-server
-make build
+export METRICS_PROMETHEUS_ENDPOINT="http://localhost:9090/api/v1"
 ```
 
-## Usage
+### Getting Prometheus Configuration
 
-### Server Modes
+1. **Endpoint**: Your Prometheus server endpoint URL with API version (e.g., `http://localhost:9090/api/v1`)
 
-The server supports two modes of operation:
+### Example Queries
 
-1. **stdio mode** (default): Standard MCP protocol communication via stdin/stdout
-   - This is the standard MCP transport used by most clients
-   - Required for Claude Desktop, mcphost, and other MCP clients
-2. **sse mode**: Server-Sent Events based MCP server for web clients
-   - Uses Streamable HTTP transport with SSE as defined in the MCP specification
-   - Provides real-time communication over HTTP using Server-Sent Events
-   - Useful for web applications and custom integrations
-
-#### Stdio Mode (Default)
-
-Perfect for MCP clients like Claude Desktop:
-
-```bash
-# Enable events module
-ops-mcp-server --events
-
-# Enable multiple modules with stdio mode (default)
-ops-mcp-server --enable-events --enable-metrics --enable-logs
-
-# Use with config file
-ops-mcp-server -c configs/config.yaml
-```
-
-#### SSE Mode
-
-For web-based MCP clients using Server-Sent Events:
-
-```bash
-# Run SSE server on 0.0.0.0:3000 (accessible from any interface)
-ops-mcp-server --mode sse --host 0.0.0.0 --port 3000 --enable-events
-
-# Access MCP endpoint at http://localhost:3000/mcp (or use server IP)
-```
-
-### Basic Usage
-
-The server communicates via the selected mode using the MCP protocol:
-
-```bash
-# Enable events module (stdio mode by default)
-ops-mcp-server --enable-events
-
-# Enable multiple modules
-ops-mcp-server --enable-events --enable-metrics --enable-logs
-
-# Use with config file
-ops-mcp-server -c configs/config.yaml
-
-# Switch to SSE mode
-ops-mcp-server --mode sse --enable-events --enable-metrics --enable-logs
-```
-
-### MCP Client Integration
-
-To use this server with MCP clients (like Claude Desktop, mcphost, etc.), configure your client to launch the server. Here are three common deployment patterns:
-
-#### Configuration Examples
-
-##### 1. SSE Mode (HTTP Transport)
-
-For web-based clients or when you need HTTP-based communication:
-
+#### List Clusters
 ```json
 {
-  "mcpServers": {
-    "local-sse": {
-      "disabled": false,
-      "timeout": 60,
-      "url": "http://localhost:3000/mcp",
-      "transportType": "sse"
-    }
-  }
+  "tool": "get_clusters"
 }
 ```
 
-Start the server in SSE mode:
-```bash
-ops-mcp-server --mode sse --host localhost --port 3000 --enable-events --enable-metrics --enable-logs
-```
-
-##### 2. Local Binary (STDIO Mode)
-
-For direct execution of the local binary:
-
+#### Get Pods in Specific Namespace
 ```json
 {
-  "mcpServers": {
-    "local-stdio": {
-      "command": "/bin/ops-mcp-server",
-      "timeout": 600,
-      "args": [
-        "--mode",
-        "stdio",
-        "--enable-events"
-      ]
-    }
-  }
+  "tool": "get_pods",
+  "cluster": "my-cluster",
+  "namespace": "default",
+  "limit": "10"
 }
 ```
 
-Build the binary first:
-```bash
-make build
-# Binary will be available at ./bin/ops-mcp-server
-```
-
-##### 3. Docker Container (STDIO Mode)
-
-For containerized deployment using the published Docker image:
-
+#### Get Pod Resource Usage
 ```json
 {
-  "mcpServers": {
-    "local-docker-stdio": {
-      "command": "docker",
-      "timeout": 600,
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "shaowenchen/ops-mcp-server:latest",
-        "--enable-events",
-        "--enable-metrics",
-        "--enable-logs",
-        "--mode",
-        "stdio"
-      ]
-    }
-  }
+  "tool": "get_pod_resource_usage",
+  "cluster": "my-cluster",
+  "namespace": "kube-system",
+  "limit": "20"
 }
+```
+
+#### Get Node Resource Usage
+```json
+{
+  "tool": "get_node_resource_usage",
+  "cluster": "my-cluster",
+  "limit": "10"
+}
+```
+
+#### Custom PromQL Query
+```json
+{
+  "tool": "query_metrics",
+  "query": "up{job=\"kubernetes-nodes\"}"
+}
+```
+
+### Query Examples
+
+**CPU Usage:**
+```
+rate(cpu_usage_total[5m])
+```
+
+**Memory Usage:**
+```
+(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+```
+
+**HTTP Request Rate:**
+```
+rate(http_requests_total[5m])
+```
+
+**Pod Resource Usage:**
+```
+container_memory_usage_bytes{pod=~"my-app-.*"}
+```
+
+### Time Ranges
+
+Supported time range values:
+- `1h` - Last hour
+- `24h` - Last 24 hours  
+- `7d` - Last 7 days
+- `30d` - Last 30 days
+
+### Query Steps
+
+For range queries, you can specify the resolution step:
+- `30s` - 30 second intervals
+- `1m` or `60s` - 1 minute intervals (default)
+- `5m` - 5 minute intervals
+- `1h` - 1 hour intervals
+
+## Events Module
+
+Query Kubernetes events with improved parameter names:
+
+- `get_pod_events` - Use `pod` parameter for specific pod name
+- `get_deployment_events` - Use `deployment` parameter for specific deployment name  
+- `get_nodes_events` - Use `node` parameter for specific node name
+
+## Quick Start
+
+1. Configure your monitoring endpoints in `configs/config.yaml`
+2. Set sensitive tokens via environment variables
+3. Run the server in stdio mode:
+
+```bash
+./bin/ops-mcp-server --config configs/config.yaml
+```
+
+## Building
+
+```bash
+go build -o bin/ops-mcp-server cmd/server/main.go
 ```
 

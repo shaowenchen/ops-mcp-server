@@ -66,6 +66,8 @@ func initConfig() {
 	viper.BindEnv("log.level", "LOG_LEVEL")
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
+	viper.BindEnv("events.token", "EVENTS_TOKEN")
+	viper.BindEnv("metrics.prometheus.endpoint", "METRICS_PROMETHEUS_ENDPOINT")
 
 	// Load main config file first
 	if cfgFile != "" {
@@ -164,7 +166,22 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	if cfg.Metrics.Enabled {
-		metricsTools := metricsModule.GetTools()
+		// Create metrics module instance with configuration
+		metricsConfig := &metricsModule.Config{}
+
+		// Add Prometheus configuration if available
+		if cfg.Metrics.Prometheus != nil {
+			metricsConfig.Prometheus = &metricsModule.PrometheusConfig{
+				Endpoint: cfg.Metrics.Prometheus.Endpoint,
+			}
+		}
+
+		metricsModuleInstance, err := metricsModule.New(metricsConfig, logger)
+		if err != nil {
+			logger.Fatal("Failed to create metrics module", zap.Error(err))
+		}
+
+		metricsTools := metricsModuleInstance.GetTools()
 		for _, serverTool := range metricsTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			toolCount++

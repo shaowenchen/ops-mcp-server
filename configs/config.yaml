@@ -22,7 +22,10 @@ events:
 
 # Metrics module - provides metrics monitoring capabilities  
 metrics:
-  enabled: false
+  enabled: true
+  prometheus:
+    # Prometheus endpoint URL with API version (without trailing slash)
+    endpoint: "http://localhost:9090/api/v1"
 
 # Logs module - provides log analysis capabilities
 logs:

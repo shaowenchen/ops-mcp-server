@@ -32,9 +32,15 @@ type EventsConfig struct {
 	Token    string `mapstructure:"token" json:"token" yaml:"token"`
 }
 
+// PrometheusConfig contains Prometheus configuration for metrics
+type PrometheusConfig struct {
+	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+}
+
 // MetricsConfig contains metrics module configuration
 type MetricsConfig struct {
-	Enabled bool `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Enabled    bool              `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Prometheus *PrometheusConfig `mapstructure:"prometheus" json:"prometheus" yaml:"prometheus"`
 }
 
 // LogsConfig contains logs module configuration
