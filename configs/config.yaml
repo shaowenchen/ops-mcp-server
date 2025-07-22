@@ -1,41 +1,35 @@
-# Ops MCP Server Configuration
-# This configuration file provides settings for the modular MCP server
-
-# Logging configuration
 log:
   level: info
 
-# Server configuration
 server:
   host: 0.0.0.0
   port: 3000
-  mode: stdio  # Server mode: "stdio" or "sse"
+  mode: stdio
 
-# Module configurations
-# Each module can be enabled/disabled and configured independently
-
-# Events module - provides event querying capabilities
 events:
   enabled: true
-  endpoint: "http://localhost:8080/api/v1/events"
-  token: ""
+  endpoint: "https://ops-server.your-company.com/api/v1/events"
+  token: "${EVENTS_API_TOKEN}"
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-nats"
 
-# Metrics module - provides metrics monitoring capabilities  
 metrics:
   enabled: true
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-prometheus"
   prometheus:
-    # Prometheus endpoint URL with API version (without trailing slash)
-    endpoint: "http://localhost:9090/api/v1"
+    endpoint: "https://prometheus.your-company.com/api/v1"
+    timeout: 30
 
-# Logs module - provides log analysis capabilities
 logs:
-  enabled: false
-
-# Legacy SSE configuration (not used in MCP stdio mode)
-sse:
-  keepAlive: 30s
-  maxConnections: 1000
-
-# Authentication configuration (placeholder)
-auth:
-  enabled: false
+  enabled: true
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-elasticsearch"
+  elasticsearch:
+    endpoint: "https://elasticsearch.your-company.com:9200"
+    username: "${ELASTICSEARCH_USER}"
+    password: "${ELASTICSEARCH_PASSWORD}"
+    timeout: 30

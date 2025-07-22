@@ -1,162 +1,252 @@
 # Ops MCP Server
 
-A modular MCP (Model Context Protocol) server providing operational monitoring capabilities including events, metrics, and logs.
+A Model Context Protocol (MCP) server for operational tools including events, metrics, and logs management.
 
 ## Features
 
-- **Events Module**: Query Kubernetes events (pods, deployments, nodes)
-- **Metrics Module**: Query monitoring metrics through Grafana/Prometheus
-- **Logs Module**: Analyze and search application logs
+### Modules
 
-## Metrics Module - Prometheus Integration
+- **Events Module**: Monitor Kubernetes events (pods, deployments, nodes)
+- **Metrics Module**: Query Prometheus metrics and monitoring data
+- **Logs Module**: Search and analyze logs via Elasticsearch
 
-The metrics module supports querying monitoring data directly through Prometheus API, allowing you to execute Prometheus queries.
+### Tools
 
-### Available Tools
+The server provides the following MCP tools with configurable naming:
 
-#### Basic Query Tools
-- `query_metrics` - Execute custom PromQL queries
-- `query_metrics_range` - Execute range queries with time intervals
-- `get_metrics_status` - Get metrics module status
-- `get_system_overview` - Get system overview metrics
+#### Events Tools
 
-#### Kubernetes Resource Discovery
-- `get_clusters` - List all available Kubernetes clusters
-- `get_namespaces` - List namespaces (optionally filtered by cluster)
-- `get_pods` - List pods (optionally filtered by cluster/namespace)
+- `get-pod-events` - Get Kubernetes pod events from all pods in specified namespace/cluster
+- `get-deployment-events` - Get Kubernetes deployment events from all deployments in specified namespace/cluster
+- `get-node-events` - Get Kubernetes node events from all nodes in specified cluster
 
-#### Kubernetes Resource Usage
-- `get_pod_resource_usage` - Get CPU and memory usage for pods
-- `get_node_resource_usage` - Get CPU and memory usage for nodes
+#### Metrics Tools
 
-### Configuration
+- `list-metrics` - List all available metrics from Prometheus
+- `query-metrics` - Execute instant PromQL queries
+- `query-metrics-range` - Execute range PromQL queries over a time period
 
-Configure Prometheus integration in `configs/config.yaml`:
+#### Logs Tools
+
+- `search-logs` - Full-text search across log messages
+- `list-log-indices` - List all indices in the Elasticsearch cluster
+- `get-pod-logs` - Query logs for a specific Kubernetes pod
+
+### Tool Naming Convention
+
+Tools use a consistent naming convention with **hyphens** as separators:
+
+- **Format**: `{prefix}{verb-noun-context}{suffix}`
+- **Examples**: `get-pod-events`, `list-metrics`, `search-logs`
+- **Configurable**: Both prefix and suffix can be customized per module
+
+## Configuration
+
+Configure the server using a YAML file (default: `configs/config.yaml`):
 
 ```yaml
+log:
+  level: info
+
+server:
+  host: 0.0.0.0
+  port: 3000
+  mode: stdio # or "sse"
+
+# Events Module Configuration
+events:
+  enabled: true
+  endpoint: "https://ops-server.your-company.com/api/v1/events"
+  token: "${EVENTS_API_TOKEN}"
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-nats"
+
+# Metrics Module Configuration
 metrics:
   enabled: true
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-prometheus"
   prometheus:
-    endpoint: "http://localhost:9090/api/v1"
+    endpoint: "https://prometheus.your-company.com/api/v1"
+    timeout: 30
+
+# Logs Module Configuration
+logs:
+  enabled: true
+  tools:
+    prefix: "default-"
+    suffix: "-provided-by-elasticsearch"
+  elasticsearch:
+    endpoint: "https://elasticsearch.your-company.com:9200"
+    username: "${ELASTICSEARCH_USER}"
+    password: "${ELASTICSEARCH_PASSWORD}"
+    timeout: 30
 ```
 
 ### Environment Variables
 
-Configure endpoint via environment variable if needed:
+Set up your production environment by configuring these variables:
 
 ```bash
-export METRICS_PROMETHEUS_ENDPOINT="http://localhost:9090/api/v1"
+# Events API Configuration
+export EVENTS_API_TOKEN="your-events-api-token"
+
+# Elasticsearch Configuration
+export ELASTICSEARCH_USER="elastic"
+export ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
+
+# Alternative: Use API Key for Elasticsearch
+# export ELASTICSEARCH_API_KEY="your-api-key"
+
+# Optional: Prometheus Authentication
+# export PROMETHEUS_TOKEN="your-prometheus-token"
 ```
 
-### Getting Prometheus Configuration
+### Tool Name Configuration
 
-1. **Endpoint**: Your Prometheus server endpoint URL with API version (e.g., `http://localhost:9090/api/v1`)
+With the example configuration above, the actual tool names will be:
 
-### Example Queries
+#### Events Tools
 
-#### List Clusters
-```json
-{
-  "tool": "get_clusters"
-}
+- `default-get-pod-events-provided-by-nats`
+- `default-get-deployment-events-provided-by-nats`
+- `default-get-node-events-provided-by-nats`
+
+#### Metrics Tools
+
+- `default-list-metrics-provided-by-prometheus`
+- `default-query-metrics-provided-by-prometheus`
+- `default-query-metrics-range-provided-by-prometheus`
+
+#### Logs Tools
+
+- `default-search-logs-provided-by-elasticsearch`
+- `default-list-log-indices-provided-by-elasticsearch`
+- `default-get-pod-logs-provided-by-elasticsearch`
+
+To use default tool names (without prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
+
+## Usage
+
+### Tool Execution
+
+Tools can be called with parameters (using actual configured tool names):
+
+```javascript
+// Execute metrics query
+const result = await mcpClient.callTool(
+  "default-query-metrics-provided-by-prometheus",
+  {
+    query: "count by (cluster) (up)",
+  }
+);
+
+// Get pod events
+const events = await mcpClient.callTool(
+  "default-get-pod-events-provided-by-nats",
+  {
+    cluster: "production",
+    namespace: "ai-nlp-fcheck",
+    limit: "20",
+  }
+);
+
+// Search logs
+const logs = await mcpClient.callTool(
+  "default-search-logs-provided-by-elasticsearch",
+  {
+    search_term: "error",
+    limit: "50",
+  }
+);
 ```
 
-#### Get Pods in Specific Namespace
-```json
-{
-  "tool": "get_pods",
-  "cluster": "my-cluster",
-  "namespace": "default",
-  "limit": "10"
-}
-```
+## Running the Server
 
-#### Get Pod Resource Usage
-```json
-{
-  "tool": "get_pod_resource_usage",
-  "cluster": "my-cluster",
-  "namespace": "kube-system",
-  "limit": "20"
-}
-```
+### Docker Container (Recommended)
 
-#### Get Node Resource Usage
-```json
-{
-  "tool": "get_node_resource_usage",
-  "cluster": "my-cluster",
-  "limit": "10"
-}
-```
-
-#### Custom PromQL Query
-```json
-{
-  "tool": "query_metrics",
-  "query": "up{job=\"kubernetes-nodes\"}"
-}
-```
-
-### Query Examples
-
-**CPU Usage:**
-```
-rate(cpu_usage_total[5m])
-```
-
-**Memory Usage:**
-```
-(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
-```
-
-**HTTP Request Rate:**
-```
-rate(http_requests_total[5m])
-```
-
-**Pod Resource Usage:**
-```
-container_memory_usage_bytes{pod=~"my-app-.*"}
-```
-
-### Time Ranges
-
-Supported time range values:
-- `1h` - Last hour
-- `24h` - Last 24 hours  
-- `7d` - Last 7 days
-- `30d` - Last 30 days
-
-### Query Steps
-
-For range queries, you can specify the resolution step:
-- `30s` - 30 second intervals
-- `1m` or `60s` - 1 minute intervals (default)
-- `5m` - 5 minute intervals
-- `1h` - 1 hour intervals
-
-## Events Module
-
-Query Kubernetes events with improved parameter names:
-
-- `get_pod_events` - Use `pod` parameter for specific pod name
-- `get_deployment_events` - Use `deployment` parameter for specific deployment name  
-- `get_nodes_events` - Use `node` parameter for specific node name
-
-## Quick Start
-
-1. Configure your monitoring endpoints in `configs/config.yaml`
-2. Set sensitive tokens via environment variables
-3. Run the server in stdio mode:
+#### Quick Start with Docker
 
 ```bash
-./bin/ops-mcp-server --config configs/config.yaml
+# Run with default configuration
+docker run -d \
+  --name ops-mcp-server \
+  -p 3000:3000 \
+  -e EVENTS_API_TOKEN="your-events-api-token" \
+  -e ELASTICSEARCH_USER="elastic" \
+  -e ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  shaowenchen/ops-mcp-server:latest \
+  --mode=sse --enable-events --enable-metrics --enable-logs
 ```
 
-## Building
+#### Docker with Custom Configuration
 
 ```bash
-go build -o bin/ops-mcp-server cmd/server/main.go
+# Run with custom config file
+docker run -d \
+  --name ops-mcp-server \
+  -p 3000:3000 \
+  -v $(pwd)/configs/config.yaml:/app/config/config.yaml \
+  -e EVENTS_API_TOKEN="your-events-api-token" \
+  -e ELASTICSEARCH_USER="elastic" \
+  -e ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  shaowenchen/ops-mcp-server:latest \
+  --config=/app/config/config.yaml --mode=sse
 ```
 
+#### Docker Compose
+
+```yaml
+version: "3.8"
+services:
+  ops-mcp-server:
+    image: shaowenchen/ops-mcp-server:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - OPS_MCP_ENV=production
+      - OPS_MCP_LOG_LEVEL=info
+      - EVENTS_API_TOKEN=${EVENTS_API_TOKEN}
+      - ELASTICSEARCH_USER=${ELASTICSEARCH_USER}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+    command:
+      ["--mode=sse", "--enable-events", "--enable-metrics", "--enable-logs"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+```
+
+### Server Modes
+
+#### SSE Mode (Server-Sent Events)
+
+The server runs in SSE mode for web-based clients and HTTP API access:
+
+```bash
+# Access the server at http://localhost:3000
+# Health check endpoint: http://localhost:3000/health
+# API endpoints available for web clients
+```
+
+### CLI Options
+
+- `--mode`: Server mode (`stdio` or `sse`, default: `stdio`)
+- `--config`: Config file path (default: `configs/config.yaml`)
+- `--enable-events`: Enable events module
+- `--enable-metrics`: Enable metrics module
+- `--enable-logs`: Enable logs module
+- `--port`: Server port (default: 3000)
+- `--host`: Server host (default: 0.0.0.0)

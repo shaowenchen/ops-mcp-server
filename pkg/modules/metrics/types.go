@@ -1,6 +1,10 @@
 package metrics
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // MetricData represents basic metric data
 type MetricData struct {
@@ -27,6 +31,52 @@ type PrometheusQueryRequest struct {
 type PrometheusValue struct {
 	Timestamp float64 `json:"timestamp"`
 	Value     string  `json:"value"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for PrometheusValue
+// Prometheus API returns values as arrays: [timestamp, "value"]
+func (pv *PrometheusValue) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as array first (Prometheus format)
+	var arr []interface{}
+	if err := json.Unmarshal(data, &arr); err == nil {
+		if len(arr) == 2 {
+			// First element should be timestamp (number)
+			if timestamp, ok := arr[0].(float64); ok {
+				pv.Timestamp = timestamp
+			} else {
+				return fmt.Errorf("invalid timestamp format in PrometheusValue array")
+			}
+
+			// Second element should be value (string)
+			if value, ok := arr[1].(string); ok {
+				pv.Value = value
+			} else {
+				return fmt.Errorf("invalid value format in PrometheusValue array")
+			}
+			return nil
+		}
+		return fmt.Errorf("PrometheusValue array must have exactly 2 elements, got %d", len(arr))
+	}
+
+	// Fallback: try to unmarshal as object (for backwards compatibility)
+	var obj struct {
+		Timestamp float64 `json:"timestamp"`
+		Value     string  `json:"value"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return fmt.Errorf("failed to unmarshal PrometheusValue as array or object: %w", err)
+	}
+
+	pv.Timestamp = obj.Timestamp
+	pv.Value = obj.Value
+	return nil
+}
+
+// MarshalJSON implements custom JSON marshaling for PrometheusValue
+func (pv PrometheusValue) MarshalJSON() ([]byte, error) {
+	// Marshal as array to match Prometheus format
+	arr := []interface{}{pv.Timestamp, pv.Value}
+	return json.Marshal(arr)
 }
 
 // PrometheusMetric represents a metric with labels

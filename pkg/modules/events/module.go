@@ -15,11 +15,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// ToolsConfig contains tools configuration
+type ToolsConfig struct {
+	Prefix string `mapstructure:"prefix" json:"prefix" yaml:"prefix"`
+	Suffix string `mapstructure:"suffix" json:"suffix" yaml:"suffix"`
+}
+
 // Config contains events module configuration
 type Config struct {
 	Endpoint     string        `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
 	Token        string        `mapstructure:"token" json:"token" yaml:"token"`
-	PollInterval time.Duration `mapstructure:"pollInterval" json:"pollInterval" yaml:"pollInterval"`
+	PollInterval time.Duration `mapstructure:"poll_interval" json:"poll_interval" yaml:"poll_interval"`
+	Tools        ToolsConfig   `mapstructure:"tools" json:"tools" yaml:"tools"`
 }
 
 // Module represents the events module
@@ -61,12 +68,42 @@ func (m *Module) makeRequest(ctx context.Context, method, path string, body inte
 // makeRequestWithFullURL creates and executes an HTTP request with authentication using full URL
 func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
+	var bodyStr string
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewBuffer(jsonData)
+		bodyStr = string(jsonData)
+	}
+
+	// Log request details
+	m.logger.Info("🎪 Making Events API Request",
+		zap.String("method", method),
+		zap.String("full_url", url),
+		zap.String("endpoint", m.config.Endpoint),
+		zap.Bool("has_body", body != nil),
+		zap.Bool("has_token", m.config.Token != ""))
+
+	// Also print to console for visibility
+	fmt.Printf("🔍 Events API Call: %s %s\n", method, url)
+	if bodyStr != "" {
+		// Pretty print JSON body if it's not too long
+		if len(bodyStr) < 500 {
+			var prettyBody interface{}
+			if err := json.Unmarshal([]byte(bodyStr), &prettyBody); err == nil {
+				if prettyJSON, err := json.MarshalIndent(prettyBody, "", "  "); err == nil {
+					fmt.Printf("📋 Request Body:\n%s\n", string(prettyJSON))
+				} else {
+					fmt.Printf("📋 Request Body: %s\n", bodyStr)
+				}
+			} else {
+				fmt.Printf("📋 Request Body: %s\n", bodyStr)
+			}
+		} else {
+			fmt.Printf("📋 Request Body Length: %d bytes\n", len(bodyStr))
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
@@ -79,14 +116,32 @@ func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string,
 	req.Header.Set("Accept", "application/json")
 
 	// Add Authorization header if token is configured
+	authMethod := "none"
 	if m.config.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+m.config.Token)
+		authMethod = "bearer_token"
 	}
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
+		m.logger.Error("❌ Events API Request Failed",
+			zap.String("method", method),
+			zap.String("url", url),
+			zap.Error(err))
+		fmt.Printf("❌ Events API Request Failed: %s %s - %v\n", method, url, err)
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
+
+	// Log response details
+	m.logger.Info("✅ Events API Response Received",
+		zap.String("method", method),
+		zap.String("url", url),
+		zap.Int("status_code", resp.StatusCode),
+		zap.String("status", resp.Status),
+		zap.String("auth_method", authMethod),
+		zap.Int64("content_length", resp.ContentLength))
+
+	fmt.Printf("✅ Events API Response: %d %s\n", resp.StatusCode, resp.Status)
 
 	return resp, nil
 }
@@ -259,23 +314,30 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 func (m *Module) GetTools() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool:    getPodEventsToolDefinition(),
+			Tool:    m.getPodEventsToolDefinition(),
 			Handler: m.handleGetPodEvents,
 		},
 		{
-			Tool:    getDeploymentEventsToolDefinition(),
+			Tool:    m.getDeploymentEventsToolDefinition(),
 			Handler: m.handleGetDeploymentEvents,
 		},
 		{
-			Tool:    getNodesEventsToolDefinition(),
+			Tool:    m.getNodesEventsToolDefinition(),
 			Handler: m.handleGetNodesEvents,
 		},
 	}
 }
 
 // Tool definitions
-func getPodEventsToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_pod_events",
+func (m *Module) getPodEventsToolDefinition() mcp.Tool {
+	toolName := "get-pod-events"
+	if m.config.Tools.Prefix != "" {
+		toolName = m.config.Tools.Prefix + toolName
+	}
+	if m.config.Tools.Suffix != "" {
+		toolName = toolName + m.config.Tools.Suffix
+	}
+	return mcp.NewTool(toolName,
 		mcp.WithDescription("Get Kubernetes pod events from all pods in specified namespace/cluster. Returns events with pod names in parsed_info.name field. No need to specify individual pod names."),
 		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
 		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
@@ -286,8 +348,15 @@ func getPodEventsToolDefinition() mcp.Tool {
 	)
 }
 
-func getDeploymentEventsToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_deployment_events",
+func (m *Module) getDeploymentEventsToolDefinition() mcp.Tool {
+	toolName := "get-deployment-events"
+	if m.config.Tools.Prefix != "" {
+		toolName = m.config.Tools.Prefix + toolName
+	}
+	if m.config.Tools.Suffix != "" {
+		toolName = toolName + m.config.Tools.Suffix
+	}
+	return mcp.NewTool(toolName,
 		mcp.WithDescription("Get Kubernetes deployment events from all deployments in specified namespace/cluster. Returns events with deployment names in parsed_info.name field. No need to specify individual deployment names."),
 		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
 		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
@@ -298,8 +367,15 @@ func getDeploymentEventsToolDefinition() mcp.Tool {
 	)
 }
 
-func getNodesEventsToolDefinition() mcp.Tool {
-	return mcp.NewTool("get_nodes_events",
+func (m *Module) getNodesEventsToolDefinition() mcp.Tool {
+	toolName := "get-node-events"
+	if m.config.Tools.Prefix != "" {
+		toolName = m.config.Tools.Prefix + toolName
+	}
+	if m.config.Tools.Suffix != "" {
+		toolName = toolName + m.config.Tools.Suffix
+	}
+	return mcp.NewTool(toolName,
 		mcp.WithDescription("Get Kubernetes node events from all nodes in specified cluster. Returns events with node names in parsed_info.name field. No need to specify individual node names."),
 		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional - if not provided, shows all clusters)")),
 		mcp.WithString("node", mcp.Description("Specific node name to query (optional - if not provided, shows all nodes)")),

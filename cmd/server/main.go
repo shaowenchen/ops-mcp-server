@@ -41,7 +41,7 @@ func init() {
 	rootCmd.PersistentFlags().String("mode", "stdio", "Server mode: stdio or sse")
 
 	// Module flags with different names to avoid conflicts
-	rootCmd.PersistentFlags().Bool("enable-events", true, "Enable events module")
+	rootCmd.PersistentFlags().Bool("enable-events", false, "Enable events module")
 	rootCmd.PersistentFlags().Bool("enable-metrics", false, "Enable metrics module")
 	rootCmd.PersistentFlags().Bool("enable-logs", false, "Enable logs module")
 
@@ -68,6 +68,10 @@ func initConfig() {
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("events.token", "EVENTS_TOKEN")
 	viper.BindEnv("metrics.prometheus.endpoint", "METRICS_PROMETHEUS_ENDPOINT")
+	viper.BindEnv("logs.elasticsearch.endpoint", "LOGS_ELASTICSEARCH_ENDPOINT")
+	viper.BindEnv("logs.elasticsearch.username", "LOGS_ELASTICSEARCH_USERNAME")
+	viper.BindEnv("logs.elasticsearch.password", "LOGS_ELASTICSEARCH_PASSWORD")
+	viper.BindEnv("logs.elasticsearch.apikey", "LOGS_ELASTICSEARCH_API_KEY")
 
 	// Load main config file first
 	if cfgFile != "" {
@@ -151,23 +155,34 @@ func runServer(cmd *cobra.Command, args []string) {
 			Endpoint:     cfg.Events.Endpoint,
 			Token:        cfg.Events.Token,
 			PollInterval: 30 * time.Second, // default poll interval
+			Tools: eventsModule.ToolsConfig{
+				Prefix: cfg.Events.Tools.Prefix,
+				Suffix: cfg.Events.Tools.Suffix,
+			},
 		}
 		eventsModuleInstance, err := eventsModule.New(eventsConfig, logger)
 		if err != nil {
 			logger.Fatal("Failed to create events module", zap.Error(err))
 		}
 
+		// Register tools
 		eventsTools := eventsModuleInstance.GetTools()
 		for _, serverTool := range eventsTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			toolCount++
 		}
+
 		logger.Info("Events module enabled", zap.Int("tools", len(eventsTools)))
 	}
 
 	if cfg.Metrics.Enabled {
 		// Create metrics module instance with configuration
-		metricsConfig := &metricsModule.Config{}
+		metricsConfig := &metricsModule.Config{
+			Tools: metricsModule.ToolsConfig{
+				Prefix: cfg.Metrics.Tools.Prefix,
+				Suffix: cfg.Metrics.Tools.Suffix,
+			},
+		}
 
 		// Add Prometheus configuration if available
 		if cfg.Metrics.Prometheus != nil {
@@ -181,20 +196,47 @@ func runServer(cmd *cobra.Command, args []string) {
 			logger.Fatal("Failed to create metrics module", zap.Error(err))
 		}
 
+		// Register tools
 		metricsTools := metricsModuleInstance.GetTools()
 		for _, serverTool := range metricsTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			toolCount++
 		}
+
 		logger.Info("Metrics module enabled", zap.Int("tools", len(metricsTools)))
 	}
 
 	if cfg.Logs.Enabled {
-		logsTools := logsModule.GetTools()
+		// Create logs module instance with configuration
+		logsConfig := &logsModule.Config{
+			Tools: logsModule.ToolsConfig{
+				Prefix: cfg.Logs.Tools.Prefix,
+				Suffix: cfg.Logs.Tools.Suffix,
+			},
+		}
+
+		// Convert elasticsearch config if present
+		if cfg.Logs.Elasticsearch != nil {
+			logsConfig.Elasticsearch = &logsModule.ElasticsearchConfig{
+				Endpoint: cfg.Logs.Elasticsearch.Endpoint,
+				Username: cfg.Logs.Elasticsearch.Username,
+				Password: cfg.Logs.Elasticsearch.Password,
+				APIKey:   cfg.Logs.Elasticsearch.APIKey,
+				Timeout:  cfg.Logs.Elasticsearch.Timeout,
+			}
+		}
+		logsModuleInstance, err := logsModule.New(logsConfig, logger)
+		if err != nil {
+			logger.Fatal("Failed to create logs module", zap.Error(err))
+		}
+
+		// Register tools
+		logsTools := logsModuleInstance.GetTools()
 		for _, serverTool := range logsTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			toolCount++
 		}
+
 		logger.Info("Logs module enabled", zap.Int("tools", len(logsTools)))
 	}
 
