@@ -145,6 +145,8 @@ type EventsListRequest struct {
 	StartTime string `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	Limit     int    `json:"limit,omitempty" yaml:"limit,omitempty"`
 	Offset    int    `json:"offset,omitempty" yaml:"offset,omitempty"`
+	// Raw subject pattern for direct NATS queries (takes precedence over structured fields)
+	SubjectPattern string `json:"subjectPattern,omitempty" yaml:"subjectPattern,omitempty"`
 	// Kubernetes-specific fields
 	Cluster      string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	Namespace    string `json:"namespace,omitempty" yaml:"namespace,omitempty"`       // not applicable for nodes

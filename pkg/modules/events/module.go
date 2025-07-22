@@ -219,8 +219,15 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 		return nil, fmt.Errorf("events endpoint not configured")
 	}
 
-	// Build subject pattern for the API path
-	subjectPattern := m.buildSubjectPattern(req)
+	// Use raw subject pattern if provided, otherwise build from structured fields
+	var subjectPattern string
+	if req.SubjectPattern != "" {
+		subjectPattern = req.SubjectPattern
+		m.logger.Info("Using raw subject pattern", zap.String("pattern", subjectPattern))
+	} else {
+		// Build subject pattern for the API path
+		subjectPattern = m.buildSubjectPattern(req)
+	}
 
 	// Build query parameters
 	queryParams := make(map[string]string)
@@ -325,6 +332,10 @@ func (m *Module) GetTools() []server.ServerTool {
 			Tool:    m.getNodesEventsToolDefinition(),
 			Handler: m.handleGetNodesEvents,
 		},
+		{
+			Tool:    m.getRawEventsToolDefinition(),
+			Handler: m.handleGetRawEvents,
+		},
 	}
 }
 
@@ -385,6 +396,23 @@ func (m *Module) getNodesEventsToolDefinition() mcp.Tool {
 	)
 }
 
+func (m *Module) getRawEventsToolDefinition() mcp.Tool {
+	toolName := "get-events"
+	if m.config.Tools.Prefix != "" {
+		toolName = m.config.Tools.Prefix + toolName
+	}
+	if m.config.Tools.Suffix != "" {
+		toolName = toolName + m.config.Tools.Suffix
+	}
+	return mcp.NewTool(toolName,
+		mcp.WithDescription("Get events using raw NATS subject patterns. Supports three query types: 1) Direct query (exact subject), 2) Wildcard query (using * for single level), 3) Prefix matching (using > for multi-level suffix). Examples: 'ops.clusters.{cluster}.namespaces.{namespace}.pods.{pod-name}.event', 'ops.clusters.*.namespaces.ops-system.webhooks.*', 'ops.clusters.*.namespaces.{namespace}.hosts.>'"),
+		mcp.WithString("subject_pattern", mcp.Required(), mcp.Description("NATS subject pattern for event querying (supports wildcards * and > for flexible matching)")),
+		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
+		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
+		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
+	)
+}
+
 // Tool handlers
 func (m *Module) handleGetPodEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return m.handleEvents(ctx, request, "pods")
@@ -396,6 +424,83 @@ func (m *Module) handleGetDeploymentEvents(ctx context.Context, request mcp.Call
 
 func (m *Module) handleGetNodesEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return m.handleEvents(ctx, request, "nodes")
+}
+
+func (m *Module) handleGetRawEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+
+	// Log incoming request
+	fmt.Printf("📥 Received raw events request with args: %+v\n", args)
+	m.logger.Info("Processing raw events request",
+		zap.Any("arguments", args))
+
+	// Parse parameters for raw events query
+	var subjectPattern, startTime string
+	var limit, offset int = 10, 0
+
+	if val, ok := args["subject_pattern"].(string); ok {
+		subjectPattern = val
+	} else {
+		return nil, fmt.Errorf("subject_pattern is required for raw events query")
+	}
+
+	if val, ok := args["start_time"].(string); ok {
+		startTime = val
+	} else {
+		// Default: 30 minutes ago
+		defaultTime := time.Now().Add(-30 * time.Minute)
+		startTime = strconv.FormatInt(defaultTime.UnixMilli(), 10)
+	}
+	if val, ok := args["limit"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if val, ok := args["offset"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	// Create request for events API using raw subject pattern
+	req := EventsListRequest{
+		Limit:          limit,
+		Offset:         offset,
+		SubjectPattern: subjectPattern,
+		StartTime:      startTime,
+	}
+
+	// Fetch events
+	response, err := m.fetchEventsFromAPI(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch raw events: %w", err)
+	}
+
+	// Log response summary
+	fmt.Printf("✅ Successfully fetched %d events using pattern '%s' (total available: %d)\n",
+		len(response.Data.List), subjectPattern, response.Data.Total)
+
+	if len(response.Data.List) > 0 {
+		sample := response.Data.List[0]
+		fmt.Printf("📋 Sample event - Subject: %s\n", sample.Subject)
+		fmt.Printf("🔍 Parsed info - Cluster: %s, Namespace: %s, Resource: %s, Name: %s\n",
+			sample.ParsedInfo.Cluster, sample.ParsedInfo.Namespace,
+			sample.ParsedInfo.Resource, sample.ParsedInfo.Name)
+	}
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(data),
+			},
+		},
+	}, nil
 }
 
 // Common handler for events (Kubernetes and other types)
