@@ -42,17 +42,17 @@ RUN mkdir -p /runtime/logs && \
 USER appuser
 
 # Expose port
-EXPOSE 3000
+EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/healthz || exit 1
 
 # Set environment variables
 ENV OPS_MCP_ENV=production \
     OPS_MCP_LOG_LEVEL=info \
     OPS_MCP_SERVER_HOST=0.0.0.0 \
-    OPS_MCP_SERVER_PORT=3000
+    OPS_MCP_SERVER_PORT=80
 
 # Default command
 ENTRYPOINT ["./ops-mcp-server"]
@@ -63,4 +63,4 @@ LABEL maintainer="mail@chenshaowen.com" \
     version="1.0.0" \
     description="Ops MCP Server - Modular operational data querying server" \
     org.opencontainers.image.source="https://github.com/shaowenchen/ops-mcp-server" \
-    org.opencontainers.image.documentation="https://github.com/shaowenchen/ops-mcp-server/blob/main/README.md" 
+    org.opencontainers.image.documentation="https://github.com/shaowenchen/ops-mcp-server/blob/master/README.md" 

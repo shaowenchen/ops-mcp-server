@@ -152,8 +152,8 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 		return nil, fmt.Errorf("Prometheus configuration is not available")
 	}
 
-	// Build the Prometheus API path (endpoint already includes /api/v1)
-	path := fmt.Sprintf("/%s", queryType)
+	// Format: {endpoint}/api/v1/{queryType}
+	path := fmt.Sprintf("/api/v1/%s", queryType)
 
 	// Build query parameters
 	queryParams := url.Values{}

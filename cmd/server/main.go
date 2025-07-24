@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -37,7 +39,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is configs/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("host", "0.0.0.0", "Server host")
-	rootCmd.PersistentFlags().Int("port", 3000, "Server port")
+	rootCmd.PersistentFlags().Int("port", 80, "Server port")
 	rootCmd.PersistentFlags().String("mode", "stdio", "Server mode: stdio or sse")
 
 	// Module flags with different names to avoid conflicts
@@ -254,14 +256,59 @@ func runServer(cmd *cobra.Command, args []string) {
 			logger.Fatal("Stdio server failed", zap.Error(err))
 		}
 	case "sse":
-		// Create Streamable HTTP MCP server (SSE-based)
-		streamableServer := server.NewStreamableHTTPServer(mcpServer)
+		// Create a custom HTTP mux with health check endpoint
+		mux := http.NewServeMux()
+
+		// Add health check endpoint
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+
+			healthResponse := map[string]interface{}{
+				"status":    "ok",
+				"service":   "ops-mcp-server",
+				"version":   "1.0.0",
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"mode":      serverMode,
+				"modules": map[string]bool{
+					"events":  cfg.Events.Enabled,
+					"metrics": cfg.Metrics.Enabled,
+					"logs":    cfg.Logs.Enabled,
+				},
+				"tools_count": toolCount,
+			}
+
+			json.NewEncoder(w).Encode(healthResponse)
+		})
+
+		// Create custom HTTP server
+		httpServer := &http.Server{
+			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+			Handler: mux,
+		}
+
+		// Create Streamable HTTP MCP server with custom server
+		streamableServer := server.NewStreamableHTTPServer(
+			mcpServer,
+			server.WithStreamableHTTPServer(httpServer),
+			server.WithEndpointPath("/mcp"),
+		)
+
+		// Mount MCP handler to the mux
+		mux.Handle("/mcp", streamableServer)
 
 		// Start SSE server
-		addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-		logger.Info("Starting server in SSE mode", zap.String("address", addr))
+		logger.Info("Starting server in SSE mode with health check",
+			zap.String("address", httpServer.Addr),
+			zap.String("health_endpoint", "/healthz"),
+			zap.String("mcp_endpoint", "/mcp"))
 
-		if err := streamableServer.Start(addr); err != nil {
+		if err := streamableServer.Start(httpServer.Addr); err != nil {
 			logger.Fatal("SSE server failed to start", zap.Error(err))
 		}
 	default:

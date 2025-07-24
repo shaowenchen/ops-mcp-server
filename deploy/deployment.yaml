@@ -2,11 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ops-mcp-server
+  namespace: ops-system
   labels:
     app: ops-mcp-server
     version: v1.0.0
 spec:
-  replicas: 3
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,10 +21,6 @@ spec:
       labels:
         app: ops-mcp-server
         version: v1.0.0
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "3000"
-        prometheus.io/path: "/metrics"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -32,49 +29,46 @@ spec:
         fsGroup: 1000
       containers:
         - name: ops-mcp-server
-          image: shaowenchen/ops-mcp-server:latest
+          image: registry.cn-beijing.aliyuncs.com/opshub/shaowenchen-ops-mcp-server:latest
           imagePullPolicy: Always
           ports:
             - name: http
-              containerPort: 3000
-              protocol: TCP
-            - name: health
-              containerPort: 3000
+              containerPort: 80
               protocol: TCP
           env:
-            - name: OPS_MCP_ENV
-              value: "production"
-            - name: OPS_MCP_LOG_LEVEL
-              value: "info"
-            - name: OPS_MCP_SERVER_HOST
-              value: "0.0.0.0"
-            - name: OPS_MCP_SERVER_PORT
-              value: "3000"
+            - name: SERVER_MODE
+              value: "sse"
+            - name: EVENTS_ENABLED
+              value: "true"
             - name: EVENTS_ENDPOINT
-              value: "http://localhost:3000/api/v1/events"
-          args:
-            - "--config"
-            - "/app/config/config.yaml"
-            - "--enable-events"
-            - "--enable-metrics"
-            - "--enable-logs"
-            - "--mode"
-            - "sse"
-          volumeMounts:
-            - name: config-volume
-              mountPath: /app/config
-              readOnly: true
+              value: "https://ops-server.your-company.com"
+            - name: EVENTS_API_TOKEN
+              value: ""
+            - name: METRICS_ENABLED
+              value: "true"
+            - name: METRICS_PROMETHEUS_ENDPOINT
+              value: "https://prometheus.your-company.com"
+            - name: LOGS_ENABLED
+              value: "true"
+            - name: LOGS_ELASTICSEARCH_ENDPOINT
+              value: "https://elasticsearch.your-company.com"
+            - name: ELASTICSEARCH_USER
+              value: ""
+            - name: ELASTICSEARCH_PASSWORD
+              value: ""
+            - name: AUTH_ENABLED
+              value: "false"
           resources:
             limits:
-              cpu: 500m
+              cpu: 1
               memory: 512Mi
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 500m
+              memory: 256Mi
           livenessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /healthz
+              port: 80
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -82,22 +76,11 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /healthz
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
             successThreshold: 1
             failureThreshold: 3
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-      volumes:
-        - name: config-volume
-          configMap:
-            name: ops-mcp-server-config
-      restartPolicy: Always
       terminationGracePeriodSeconds: 30

@@ -5,7 +5,7 @@
 APP_NAME = ops-mcp-server
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "latest")
 BUILD_DIR = bin
-MAIN_PATH = cmd/server
+MAIN_PATH = cmd/ops-mcp-server
 DOCKER_IMAGE = shaowenchen/$(APP_NAME)
 LDFLAGS = -X main.version=$(VERSION) -w -s
 

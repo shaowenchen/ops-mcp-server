@@ -248,8 +248,8 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 	}
 
 	// Build full URL with path and query parameters
-	// Format: {endpoint}/{subject_pattern}?query_params
-	url := m.config.Endpoint + "/" + subjectPattern
+	// Format: {endpoint}/api/v1/events/{subject_pattern}?query_params
+	url := m.config.Endpoint + "/api/v1/events/" + subjectPattern
 	if len(queryParams) > 0 {
 		url += "?"
 		first := true
