@@ -255,70 +255,14 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 
 // GetTools returns all MCP tools for the metrics module
 func (m *Module) GetTools() []server.ServerTool {
-	return []server.ServerTool{
-		// List available metrics
-		{
-			Tool:    m.listMetricsToolDefinition(),
-			Handler: m.handleListMetrics,
-		},
-		// Execute instant PromQL queries
-		{
-			Tool:    m.queryMetricsToolDefinition(),
-			Handler: m.handleExecuteQuery,
-		},
-		// Execute range PromQL queries
-		{
-			Tool:    m.queryMetricsRangeToolDefinition(),
-			Handler: m.handleExecuteRangeQuery,
-		},
-	}
-}
+	// Get default tool configuration
+	toolsConfig := GetDefaultToolsConfig()
 
-// Tool definitions
+	// Tool configuration can be modified based on config file or other conditions
+	// For example: disable certain tools based on m.config
+	// toolsConfig.ListMetrics.Enabled = false
 
-func (m *Module) listMetricsToolDefinition() mcp.Tool {
-	toolName := "list-metrics"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("List all available metrics from Prometheus. Returns metric names, types, and basic information."),
-		mcp.WithString("search", mcp.Description("Filter metrics by name pattern (optional)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of metrics to return (default: 100)")),
-	)
-}
-
-func (m *Module) queryMetricsToolDefinition() mcp.Tool {
-	toolName := "query-metrics"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Execute a custom PromQL instant query. Examples: 'up', 'cpu_usage_percent', 'sum(rate(http_requests_total[5m]))'"),
-		mcp.WithString("query", mcp.Required(), mcp.Description("PromQL query expression to execute")),
-	)
-}
-
-func (m *Module) queryMetricsRangeToolDefinition() mcp.Tool {
-	toolName := "query-metrics-range"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Execute a custom PromQL range query over a time period. Examples: 'rate(cpu_usage[5m])', 'sum(memory_usage_bytes) by (pod)'"),
-		mcp.WithString("query", mcp.Required(), mcp.Description("PromQL query expression to execute")),
-		mcp.WithString("time_range", mcp.Required(), mcp.Description("Time range for query (1h, 24h, 7d, 30d)")),
-		mcp.WithString("step", mcp.Description("Query resolution step (default: 60s, examples: 30s, 5m, 1h)")),
-	)
+	return m.BuildTools(toolsConfig)
 }
 
 func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

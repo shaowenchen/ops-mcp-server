@@ -1,201 +1,204 @@
 # Ops MCP Server
 
-一个用于运维工具的模型上下文协议（MCP）服务器，包括事件、指标和日志管理功能。
+A Model Context Protocol (MCP) server for operations tools, including event, metrics, and log management capabilities.
 
-## 项目概览
+## Project Overview
 
-Ops MCP Server 是一个基于Go语言开发的MCP服务器，为AI助手（如Claude、VS Code等）提供运维数据查询能力。通过统一的MCP协议，AI助手可以直接查询Kubernetes事件、Prometheus指标和Elasticsearch日志。
+Ops MCP Server is a Go-based MCP server that provides operations data query capabilities for AI assistants (such as Claude, VS Code, etc.). Through the unified MCP protocol, AI assistants can directly query Kubernetes events, Prometheus metrics, and Elasticsearch logs.
 
-### 架构图
+### Architecture Diagram
 
 ```mermaid
 graph TB
     subgraph "MCP Client"
         Client["MCP Client<br/>(Claude, VS Code, etc.)"]
     end
-    
+
     subgraph "Ops MCP Server"
         Server["HTTP/SSE Server<br/>:80"]
         Core["MCP Core<br/>(Tool Registry)"]
-        
+
         subgraph "Modules"
             Events["Events Module<br/>(Kubernetes Events)"]
             Metrics["Metrics Module<br/>(Prometheus)"]
             Logs["Logs Module<br/>(Elasticsearch)"]
         end
-        
+
         subgraph "Configuration"
             Config["config.yaml<br/>(Tool naming, endpoints)"]
             Env["Environment Variables<br/>(Credentials)"]
         end
     end
-    
+
     subgraph "External Services"
         K8sAPI["Kubernetes API<br/>(Events Service)"]
         Prometheus["Prometheus<br/>(Metrics API)"]
         ES["Elasticsearch<br/>(Search & Analytics)"]
     end
-    
+
     Client -.->|MCP Protocol| Server
     Server --> Core
     Core --> Events
     Core --> Metrics
     Core --> Logs
-    
+
     Events -->|HTTPS| K8sAPI
     Metrics -->|HTTPS| Prometheus
     Logs -->|HTTPS| ES
-    
+
     Config --> Events
     Config --> Metrics
     Config --> Logs
     Env --> Events
     Env --> Metrics
     Env --> Logs
-    
+
     Events -.->|"get-pod-events<br/>get-deployment-events<br/>get-node-events"| Core
     Metrics -.->|"list-metrics<br/>query-metrics<br/>query-metrics-range"| Core
     Logs -.->|"search-logs<br/>get-pod-logs<br/>list-log-indices"| Core
 ```
 
-## 功能特性
+## Features
 
-### 核心模块
+### Core Modules
 
-- **🎯 Events Module（事件模块）**: 监控Kubernetes事件（pods、deployments、nodes）
-- **📊 Metrics Module（指标模块）**: 查询Prometheus指标和监控数据  
-- **📋 Logs Module（日志模块）**: 通过Elasticsearch搜索和分析日志
+- **🎯 Events Module**: Monitor Kubernetes events (pods, deployments, nodes)
+- **📊 Metrics Module**: Query Prometheus metrics and monitoring data
+- **📋 Logs Module**: Search and analyze logs through Elasticsearch
 
-### 支持的工具
+### Supported Tools
 
-服务器提供以下可配置命名的MCP工具：
+The server provides the following configurable MCP tools:
 
-#### 事件工具 (Events Tools)
+#### Events Tools
 
-- `get-pod-events` - 获取指定命名空间/集群中所有Pod的Kubernetes事件
-- `get-deployment-events` - 获取指定命名空间/集群中所有Deployment的Kubernetes事件
-- `get-node-events` - 获取指定集群中所有Node的Kubernetes事件
+- `get-pod-events` - Get Kubernetes events from all pods in specified namespace/cluster
+- `get-deployment-events` - Get Kubernetes events from all deployments in specified namespace/cluster
+- `get-node-events` - Get Kubernetes events from all nodes in specified cluster
 
-#### 指标工具 (Metrics Tools)
+#### Metrics Tools
 
-- `list-metrics` - 列出Prometheus中所有可用指标
-- `query-metrics` - 执行即时PromQL查询
-- `query-metrics-range` - 在时间范围内执行PromQL查询
+- `list-metrics` - List all available metrics from Prometheus
+- `query-metrics` - Execute instant PromQL queries
+- `query-metrics-range` - Execute PromQL range queries over time periods
 
-#### 日志工具 (Logs Tools)
+#### Logs Tools
 
-- `search-logs` - 全文搜索日志消息
-- `list-log-indices` - 列出Elasticsearch集群中的所有索引
-- `get-pod-logs` - 查询特定Kubernetes Pod的日志
+- `search-logs` - Full-text search across log messages
+- `list-log-indices` - List all indices in the Elasticsearch cluster
+- `get-pod-logs` - Query logs for specific Kubernetes pods
 
-### 工具命名规范
+### Tool Naming Convention
 
-工具使用一致的命名规范，以**连字符**作为分隔符：
+Tools use a consistent naming convention with **hyphens** as separators:
 
-- **格式**: `{prefix}{verb-noun-context}{suffix}`
-- **示例**: `get-pod-events`, `list-metrics`, `search-logs`
-- **可配置**: 每个模块的前缀和后缀都可以自定义
+- **Format**: `{prefix}{verb-noun-context}{suffix}`
+- **Examples**: `get-pod-events`, `list-metrics`, `search-logs`
+- **Configurable**: Prefix and suffix can be customized for each module
 
-## 配置说明
+## Configuration
 
-使用YAML文件配置服务器（默认路径：`configs/config.yaml`）：
+Configure the server using a YAML file (default path: `configs/config.yaml`):
 
 ```yaml
-# 日志配置
+# Logging configuration
 log:
-  level: info  # 日志级别: debug, info, warn, error
+  level: info # Log level: debug, info, warn, error
 
-# 服务器配置
+# Server configuration
 server:
-  host: 0.0.0.0    # 服务器绑定地址
-  port: 80         # 服务器端口
-  mode: sse        # 服务器模式: stdio 或 sse
+  host: 0.0.0.0 # Server binding address
+  port: 80 # Server port
+  mode: sse # Server mode: stdio or sse
 
-# 事件模块配置
+# Events module configuration
 events:
-  enabled: true    # 是否启用事件模块
-  endpoint: "https://ops-server.your-company.com/api/v1/events"  # 事件API端点
-  token: "${EVENTS_API_TOKEN}"  # API令牌（支持环境变量）
+  enabled: true # Whether to enable events module
+  endpoint: "https://ops-server.your-company.com/api/v1/events" # Events API endpoint
+  token: "${EVENTS_API_TOKEN}" # API token (supports environment variables)
   tools:
-    prefix: ""     # 工具名称前缀
-    suffix: "-provided-by-nats"  # 工具名称后缀
+    prefix: "" # Tool name prefix
+    suffix: "-provided-by-nats" # Tool name suffix
 
-# 指标模块配置
+# Metrics module configuration
 metrics:
-  enabled: true    # 是否启用指标模块
+  enabled: true # Whether to enable metrics module
   tools:
-    prefix: ""     # 工具名称前缀
-    suffix: "-provided-by-prometheus"  # 工具名称后缀
+    prefix: "" # Tool name prefix
+    suffix: "-provided-by-prometheus" # Tool name suffix
   prometheus:
-    endpoint: "https://prometheus.your-company.com/api/v1"  # Prometheus API端点
-    timeout: 30    # 请求超时时间（秒）
+    endpoint: "https://prometheus.your-company.com/api/v1" # Prometheus API endpoint
+    timeout: 30 # Request timeout (seconds)
 
-# 日志模块配置
+# Logs module configuration
 logs:
-  enabled: true    # 是否启用日志模块
+  enabled: true # Whether to enable logs module
   tools:
-    prefix: ""     # 工具名称前缀
-    suffix: "-provided-by-elasticsearch"  # 工具名称后缀
+    prefix: "" # Tool name prefix
+    suffix: "-provided-by-elasticsearch" # Tool name suffix
   elasticsearch:
-    endpoint: "https://elasticsearch.your-company.com:9200"  # Elasticsearch端点
-    username: "${ELASTICSEARCH_USER}"      # 用户名（支持环境变量）
-    password: "${ELASTICSEARCH_PASSWORD}"  # 密码（支持环境变量）
-    timeout: 30    # 请求超时时间（秒）
+    endpoint: "https://elasticsearch.your-company.com:9200" # Elasticsearch endpoint
+    username: "${ELASTICSEARCH_USER}" # Username (supports environment variables)
+    password: "${ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
+    timeout: 30 # Request timeout (seconds)
 ```
 
-### 环境变量配置
+### Environment Variables
 
-在生产环境中设置以下环境变量：
+Set the following environment variables in production:
 
 ```bash
-# 事件API配置
+# Events API configuration
 export EVENTS_API_TOKEN="your-events-api-token"
 
-# Elasticsearch配置
+# Elasticsearch configuration
 export ELASTICSEARCH_USER="elastic"
 export ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
 
-# 可选：使用API Key替代用户名密码
+# Optional: Use API Key instead of username/password
 # export ELASTICSEARCH_API_KEY="your-api-key"
 
-# 可选：Prometheus认证
+# Optional: Prometheus authentication
 # export PROMETHEUS_TOKEN="your-prometheus-token"
 
-# 服务器配置
+# Server configuration
 export SERVER_HOST="0.0.0.0"
 export SERVER_PORT="80"
 export LOG_LEVEL="info"
 ```
 
-### 工具名称配置示例
+### Tool Name Configuration Examples
 
-使用上述配置，实际的工具名称将为：
+With the above configuration, the actual tool names will be:
 
-#### 事件工具
+#### Events Tools
+
 - `get-pod-events-provided-by-nats`
 - `get-deployment-events-provided-by-nats`
 - `get-node-events-provided-by-nats`
 
-#### 指标工具
+#### Metrics Tools
+
 - `list-metrics-provided-by-prometheus`
 - `query-metrics-provided-by-prometheus`
 - `query-metrics-range-provided-by-prometheus`
 
-#### 日志工具
+#### Logs Tools
+
 - `search-logs-provided-by-elasticsearch`
 - `list-log-indices-provided-by-elasticsearch`
 - `get-pod-logs-provided-by-elasticsearch`
 
-要使用默认工具名称（无前缀/后缀），请将`prefix`和`suffix`都设置为空字符串`""`。
+To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
 
-## 使用指南
+## Usage Guide
 
-### 工具调用示例
+### Tool Call Examples
 
-可以使用参数调用工具（使用实际配置的工具名称）：
+You can call tools with parameters (using the actual configured tool names):
 
 ```javascript
-// 执行指标查询
+// Execute metrics query
 const result = await mcpClient.callTool(
   "query-metrics-provided-by-prometheus",
   {
@@ -203,30 +206,24 @@ const result = await mcpClient.callTool(
   }
 );
 
-// 获取Pod事件
-const events = await mcpClient.callTool(
-  "get-pod-events-provided-by-nats",
-  {
-    cluster: "production",
-    namespace: "ai-nlp-fcheck",
-    limit: "20",
-  }
-);
+// Get Pod events
+const events = await mcpClient.callTool("get-pod-events-provided-by-nats", {
+  cluster: "production",
+  namespace: "ai-nlp-fcheck",
+  limit: "20",
+});
 
-// 搜索日志
-const logs = await mcpClient.callTool(
-  "search-logs-provided-by-elasticsearch",
-  {
-    search_term: "error",
-    limit: "50",
-    time_range: "1h"
-  }
-);
+// Search logs
+const logs = await mcpClient.callTool("search-logs-provided-by-elasticsearch", {
+  search_term: "error",
+  limit: "50",
+  time_range: "1h",
+});
 ```
 
-### Claude Desktop集成示例
+### Claude Desktop Integration Example
 
-在Claude Desktop中使用此MCP服务器：
+Using this MCP server in Claude Desktop:
 
 ```json
 {
@@ -234,26 +231,33 @@ const logs = await mcpClient.callTool(
     "ops-mcp-server": {
       "command": "docker",
       "args": [
-        "run", "--rm", "-i",
-        "--env", "EVENTS_API_TOKEN=your-token",
-        "--env", "ELASTICSEARCH_USER=elastic", 
-        "--env", "ELASTICSEARCH_PASSWORD=your-password",
+        "run",
+        "--rm",
+        "-i",
+        "--env",
+        "EVENTS_API_TOKEN=your-token",
+        "--env",
+        "ELASTICSEARCH_USER=elastic",
+        "--env",
+        "ELASTICSEARCH_PASSWORD=your-password",
         "shaowenchen/ops-mcp-server:latest",
-        "--enable-events", "--enable-metrics", "--enable-logs"
+        "--enable-events",
+        "--enable-metrics",
+        "--enable-logs"
       ]
     }
   }
 }
 ```
 
-## 运行服务器
+## Running the Server
 
-### Docker容器（推荐）
+### Docker Container (Recommended)
 
-#### Docker快速启动
+#### Docker Quick Start
 
 ```bash
-# 使用默认配置运行
+# Run with default configuration
 docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
@@ -264,10 +268,10 @@ docker run -d \
   --mode=sse --enable-events --enable-metrics --enable-logs
 ```
 
-#### 使用自定义配置的Docker
+#### Docker with Custom Configuration
 
 ```bash
-# 使用自定义配置文件运行
+# Run with custom configuration file
 docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
@@ -279,7 +283,7 @@ docker run -d \
   --config=./configs/config.yaml --mode=sse
 ```
 
-#### Docker Compose部署
+#### Docker Compose Deployment
 
 ```yaml
 version: "3.8"
@@ -311,89 +315,90 @@ services:
       retries: 3
     restart: unless-stopped
     volumes:
-      - ./configs:/runtime/configs:ro  # 挂载配置文件（可选）
+      - ./configs:/runtime/configs:ro # Mount configuration files (optional)
 ```
 
-### 本地开发运行
+### Local Development
 
-#### 从源码构建
+#### Build from Source
 
 ```bash
-# 克隆项目
+# Clone the project
 git clone https://github.com/shaowenchen/ops-mcp-server.git
 cd ops-mcp-server
 
-# 安装依赖
+# Install dependencies
 make dev-setup
 
-# 构建项目
+# Build the project
 make build
 
-# 运行服务器（stdio模式，适用于MCP客户端）
+# Run server (stdio mode, for MCP clients)
 ./bin/ops-mcp-server --enable-events --enable-metrics --enable-logs
 
-# 运行服务器（SSE模式，适用于HTTP API）
+# Run server (SSE mode, for HTTP API)
 ./bin/ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs
 ```
 
-#### 使用Makefile
+#### Using Makefile
 
 ```bash
-# 快速开发周期
-make quick  # 格式化、检查、测试、构建
+# Quick development cycle
+make quick  # Format, check, test, build
 
-# 运行特定模块
-make run-events    # 仅运行事件模块
-make run-metrics   # 仅运行指标模块  
-make run-logs      # 仅运行日志模块
-make run-all       # 运行所有模块
+# Run specific modules
+make run-events    # Run events module only
+make run-metrics   # Run metrics module only
+make run-logs      # Run logs module only
+make run-all       # Run all modules
 
-# 测试MCP功能
+# Test MCP functionality
 make test-mcp
 ```
 
-### Kubernetes部署
+### Kubernetes Deployment
 
-#### 快速部署
+#### Quick Deployment
 
 ```bash
-# 构建并部署到Kubernetes
+# Build and deploy to Kubernetes
 make k8s-build-deploy
 
-# 或者分步骤执行
+# Or execute step by step
 make docker-build docker-push k8s-deploy
 ```
 
-#### 查看部署状态
+#### Check Deployment Status
 
 ```bash
-# 检查部署状态
+# Check deployment status
 make k8s-status
 
-# 查看应用日志
+# View application logs
 make k8s-logs
 
-# 清理资源
+# Clean up resources
 make k8s-cleanup
 ```
 
-### 服务器模式
+### Server Modes
 
-#### SSE模式（Server-Sent Events）
+#### SSE Mode (Server-Sent Events)
 
-SSE模式适用于基于Web的客户端和HTTP API访问：
+SSE mode is suitable for web-based clients and HTTP API access:
 
 ```bash
-# 访问服务器：http://localhost:80
-# 健康检查端点：http://localhost:80/healthz
-# MCP端点：http://localhost:80/mcp
+# Access server: http://localhost:80
+# Health check endpoint: http://localhost:80/healthz
+# MCP endpoint: http://localhost:80/mcp
 ```
 
-健康检查响应示例：
+Health check response example:
+
 ```json
 {
   "status": "ok",
-  "service": "ops-mcp-server", 
+  "service": "ops-mcp-server",
   "version": "1.0.0",
   "timestamp": "2024-01-20T10:30:00Z",
   "mode": "sse",
@@ -406,121 +411,121 @@ SSE模式适用于基于Web的客户端和HTTP API访问：
 }
 ```
 
-#### STDIO模式
+#### STDIO Mode
 
-STDIO模式适用于直接的MCP客户端集成（如Claude Desktop）：
+STDIO mode is suitable for direct MCP client integration (such as Claude Desktop):
 
 ```bash
 ./ops-mcp-server --enable-events --enable-metrics --enable-logs
 ```
 
-### 命令行选项
+### Command Line Options
 
 ```bash
-# 基本选项
---mode            # 服务器模式 (stdio|sse, 默认: stdio)
---config          # 配置文件路径 (默认: configs/config.yaml) 
---host            # 服务器主机 (默认: 0.0.0.0)
---port            # 服务器端口 (默认: 80)
---log-level       # 日志级别 (debug|info|warn|error, 默认: info)
+# Basic options
+--mode            # Server mode (stdio|sse, default: stdio)
+--config          # Configuration file path (default: configs/config.yaml)
+--host            # Server host (default: 0.0.0.0)
+--port            # Server port (default: 80)
+--log-level       # Log level (debug|info|warn|error, default: info)
 
-# 模块开关
---enable-events   # 启用事件模块
---enable-metrics  # 启用指标模块
---enable-logs     # 启用日志模块
+# Module switches
+--enable-events   # Enable events module
+--enable-metrics  # Enable metrics module
+--enable-logs     # Enable logs module
 
-# 使用示例
+# Usage example
 ./ops-mcp-server --mode=sse --enable-all --port=8080 --log-level=debug
 ```
 
-## 开发指南
+## Development Guide
 
-### 项目结构
+### Project Structure
 
 ```
 ops-mcp-server/
-├── cmd/server/           # 主程序入口
+├── cmd/server/           # Main program entry
 ├── pkg/
-│   ├── config/          # 配置结构定义
-│   ├── modules/         # 业务模块
-│   │   ├── events/      # 事件模块
-│   │   ├── metrics/     # 指标模块  
-│   │   └── logs/        # 日志模块
-│   └── server/          # 服务器配置
-├── configs/             # 配置文件
-├── deploy/              # 部署配置
-├── bin/                 # 构建输出
-└── vendor/              # Go依赖包
+│   ├── config/          # Configuration structure definitions
+│   ├── modules/         # Business modules
+│   │   ├── events/      # Events module
+│   │   ├── metrics/     # Metrics module
+│   │   └── logs/        # Logs module
+│   └── server/          # Server configuration
+├── configs/             # Configuration files
+├── deploy/              # Deployment configuration
+├── bin/                 # Build output
+└── vendor/              # Go dependencies
 ```
 
-### 构建和测试
+### Build and Test
 
 ```bash
-# 完整测试和构建
+# Complete test and build
 make all
 
-# 多平台构建
+# Multi-platform build
 make build-all
 
-# 运行测试
+# Run tests
 make test
 
-# 生成测试覆盖率报告
+# Generate test coverage report
 make test-coverage
 
-# 代码检查和格式化
+# Code check and format
 make lint fmt
 ```
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Common Issues
 
-1. **工具未找到**: 检查模块是否已启用，配置文件中工具名称是否正确
-2. **连接超时**: 验证外部服务（Prometheus、Elasticsearch）的网络连接性
-3. **认证失败**: 确认环境变量中的认证信息是否正确
-4. **端口冲突**: 使用`--port`参数指定其他端口
+1. **Tool not found**: Check if the module is enabled and if the tool name in the configuration file is correct
+2. **Connection timeout**: Verify network connectivity to external services (Prometheus, Elasticsearch)
+3. **Authentication failure**: Confirm that authentication information in environment variables is correct
+4. **Port conflict**: Use `--port` parameter to specify another port
 
-### 调试模式
+### Debug Mode
 
 ```bash
-# 启用调试日志
+# Enable debug logging
 ./ops-mcp-server --log-level=debug --enable-events --enable-metrics --enable-logs
 
-# 查看详细请求日志
+# View detailed request logs
 export LOG_LEVEL=debug
 docker run -e LOG_LEVEL=debug shaowenchen/ops-mcp-server:latest
 ```
 
-## 贡献指南
+## Contributing
 
-1. Fork项目
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 打开Pull Request
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### 开发环境设置
+### Development Environment Setup
 
 ```bash
-# 设置开发环境
+# Set up development environment
 make dev-setup
 
-# 运行pre-commit检查
+# Run pre-commit checks
 make quick
 ```
 
-## 许可证
+## License
 
-本项目采用MIT许可证 - 查看LICENSE文件了解详情。
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 支持和反馈
+## Support and Feedback
 
-- 🐛 [报告Bug](https://github.com/shaowenchen/ops-mcp-server/issues)
-- 💡 [功能请求](https://github.com/shaowenchen/ops-mcp-server/issues)
-- 📖 [文档](https://github.com/shaowenchen/ops-mcp-server/wiki)
+- 🐛 [Report Bugs](https://github.com/shaowenchen/ops-mcp-server/issues)
+- 💡 [Feature Requests](https://github.com/shaowenchen/ops-mcp-server/issues)
+- 📖 [Documentation](https://github.com/shaowenchen/ops-mcp-server/wiki)
 - 📧 Email: mail@chenshaowen.com
 
 ---
 
-**✨ 让AI助手直接访问您的运维数据，提升运维效率！**
+**✨ Let AI assistants directly access your operations data to improve operational efficiency!**

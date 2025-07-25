@@ -319,98 +319,14 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 
 // GetTools returns MCP tools for events (pods, deployments, nodes, etc.)
 func (m *Module) GetTools() []server.ServerTool {
-	return []server.ServerTool{
-		{
-			Tool:    m.getPodEventsToolDefinition(),
-			Handler: m.handleGetPodEvents,
-		},
-		{
-			Tool:    m.getDeploymentEventsToolDefinition(),
-			Handler: m.handleGetDeploymentEvents,
-		},
-		{
-			Tool:    m.getNodesEventsToolDefinition(),
-			Handler: m.handleGetNodesEvents,
-		},
-		{
-			Tool:    m.getRawEventsToolDefinition(),
-			Handler: m.handleGetRawEvents,
-		},
-	}
-}
+	// Get default tool configuration
+	toolsConfig := GetDefaultToolsConfig()
 
-// Tool definitions
-func (m *Module) getPodEventsToolDefinition() mcp.Tool {
-	toolName := "get-pod-events"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Get Kubernetes pod events from all pods in specified namespace/cluster. Returns events with pod names in parsed_info.name field. No need to specify individual pod names."),
-		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
-		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
-		mcp.WithString("pod", mcp.Description("Specific pod name to query (optional - if not provided, shows all pods)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
-		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
-		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
-	)
-}
+	// Tool configuration can be modified based on config file or other conditions
+	// For example: disable certain tools based on m.config
+	// toolsConfig.PodEvents.Enabled = false
 
-func (m *Module) getDeploymentEventsToolDefinition() mcp.Tool {
-	toolName := "get-deployment-events"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Get Kubernetes deployment events from all deployments in specified namespace/cluster. Returns events with deployment names in parsed_info.name field. No need to specify individual deployment names."),
-		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional)")),
-		mcp.WithString("namespace", mcp.Description("Filter by namespace (optional - if not provided, shows all namespaces)")),
-		mcp.WithString("deployment", mcp.Description("Specific deployment name to query (optional - if not provided, shows all deployments)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
-		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
-		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
-	)
-}
-
-func (m *Module) getNodesEventsToolDefinition() mcp.Tool {
-	toolName := "get-node-events"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Get Kubernetes node events from all nodes in specified cluster. Returns events with node names in parsed_info.name field. No need to specify individual node names."),
-		mcp.WithString("cluster", mcp.Description("Filter by cluster name (optional - if not provided, shows all clusters)")),
-		mcp.WithString("node", mcp.Description("Specific node name to query (optional - if not provided, shows all nodes)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
-		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
-		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
-	)
-}
-
-func (m *Module) getRawEventsToolDefinition() mcp.Tool {
-	toolName := "get-events"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Get events using raw NATS subject patterns. Supports three query types: 1) Direct query (exact subject), 2) Wildcard query (using * for single level), 3) Prefix matching (using > for multi-level suffix). Examples: 'ops.clusters.{cluster}.namespaces.{namespace}.pods.{pod-name}.event', 'ops.clusters.*.namespaces.ops-system.webhooks.*', 'ops.clusters.*.namespaces.{namespace}.hosts.>'"),
-		mcp.WithString("subject_pattern", mcp.Required(), mcp.Description("NATS subject pattern for event querying (supports wildcards * and > for flexible matching)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
-		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
-		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, default: 30 minutes ago)")),
-	)
+	return m.BuildTools(toolsConfig)
 }
 
 // Tool handlers

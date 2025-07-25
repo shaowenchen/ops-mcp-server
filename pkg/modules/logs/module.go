@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -84,75 +85,14 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 
 // GetTools returns all MCP tools for the logs module
 func (m *Module) GetTools() []server.ServerTool {
-	return []server.ServerTool{
-		// Log searching tools
-		{
-			Tool:    m.searchLogsToolDefinition(),
-			Handler: m.handleSearchLogs,
-		},
+	// Get default tool configuration
+	toolsConfig := GetDefaultToolsConfig()
 
-		// Pod log querying
-		{
-			Tool:    m.getPodLogsToolDefinition(),
-			Handler: m.handleGetPodLogs,
-		},
+	// Tool configuration can be modified based on config file or other conditions
+	// For example: disable certain tools based on m.config
+	// toolsConfig.SearchLogs.Enabled = false
 
-		// Elasticsearch management tools
-		{
-			Tool:    m.listLogsIndicesToolDefinition(),
-			Handler: m.handleListIndices,
-		},
-	}
-}
-
-// Tool definitions
-
-func (m *Module) searchLogsToolDefinition() mcp.Tool {
-	toolName := "search-logs"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Full-text search across log messages"),
-		mcp.WithString("search_term", mcp.Required(), mcp.Description("Text to search for in log messages")),
-		mcp.WithString("limit", mcp.Description("Maximum number of results to return (default: 50)")),
-	)
-}
-
-func (m *Module) listLogsIndicesToolDefinition() mcp.Tool {
-	toolName := "list-log-indices"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("List all indices in the Elasticsearch cluster"),
-		mcp.WithString("format", mcp.Description("Output format (table, json) - default: table")),
-		mcp.WithString("health", mcp.Description("Filter by health status (green, yellow, red)")),
-		mcp.WithString("status", mcp.Description("Filter by status (open, close)")),
-	)
-}
-
-func (m *Module) getPodLogsToolDefinition() mcp.Tool {
-	toolName := "get-pod-logs"
-	if m.config.Tools.Prefix != "" {
-		toolName = m.config.Tools.Prefix + toolName
-	}
-	if m.config.Tools.Suffix != "" {
-		toolName = toolName + m.config.Tools.Suffix
-	}
-	return mcp.NewTool(toolName,
-		mcp.WithDescription("Query logs for a specific Kubernetes pod"),
-		mcp.WithString("pod", mcp.Required(), mcp.Description("Pod name to query logs for (e.g., polity-v5-55899f979f-xt7rx)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of log entries to return (default: 100)")),
-		mcp.WithString("start_time", mcp.Description("Start time for log filtering (ISO format or relative like '1h', '30m')")),
-		mcp.WithString("end_time", mcp.Description("End time for log filtering (ISO format)")),
-	)
+	return m.BuildTools(toolsConfig)
 }
 
 // Tool handlers
@@ -194,14 +134,14 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 	// Add filters
 	if service != "" {
 		mustClauses = append(mustClauses, map[string]interface{}{
-			"term": map[string]interface{}{
+			"match": map[string]interface{}{
 				"service.keyword": service,
 			},
 		})
 	}
 	if level != "" {
 		mustClauses = append(mustClauses, map[string]interface{}{
-			"term": map[string]interface{}{
+			"match": map[string]interface{}{
 				"level.keyword": level,
 			},
 		})
@@ -209,10 +149,36 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 	if startTime != "" || endTime != "" {
 		timeRange := map[string]interface{}{}
 		if startTime != "" {
-			timeRange["gte"] = startTime
+			// Parse start time to handle relative formats like "1h", "30m", etc.
+			parsedStartTime, err := parseTimeInput(startTime)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid start_time format: %v", err),
+						},
+					},
+				}, nil
+			}
+			timeRange["gte"] = parsedStartTime
 		}
 		if endTime != "" {
-			timeRange["lte"] = endTime
+			// Parse end time to handle relative formats
+			parsedEndTime, err := parseTimeInput(endTime)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid end_time format: %v", err),
+						},
+					},
+				}, nil
+			}
+			timeRange["lte"] = parsedEndTime
 		}
 		mustClauses = append(mustClauses, map[string]interface{}{
 			"range": map[string]interface{}{
@@ -232,7 +198,7 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 		},
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", searchQuery)
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*/_search", searchQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -345,7 +311,7 @@ func (m *Module) handleGetLogStats(ctx context.Context, request mcp.CallToolRequ
 		},
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", aggQuery)
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*/_search", aggQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -480,7 +446,7 @@ func (m *Module) handleGetLogServices(ctx context.Context, request mcp.CallToolR
 		},
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", aggQuery)
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*/_search", aggQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -580,7 +546,7 @@ func (m *Module) handleGetLogLevels(ctx context.Context, request mcp.CallToolReq
 		},
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", aggQuery)
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*/_search", aggQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -704,6 +670,12 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		}
 	}
 
+	// Get index pattern - default to all indices if not specified
+	indexPattern := "*"
+	if val, ok := args["index"].(string); ok && val != "" {
+		indexPattern = val
+	}
+
 	// Build Elasticsearch full-text search query
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -717,11 +689,12 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
-		"_source": []string{"@timestamp", "level", "service", "message", "trace_id", "fields"},
+		"_source": true,
 	}
 
-	// Execute search against logs indices
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", searchQuery)
+	// Execute search against specified indices
+	searchPath := indexPattern + "/_search"
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, searchQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -773,34 +746,18 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		}, nil
 	}
 
-	// Convert Elasticsearch hits to LogEntry format
-	var results []LogEntry
+	// Convert Elasticsearch hits to structured format with all fields
+	var results []map[string]interface{}
 	for _, hit := range searchResult.Hits.Hits {
-		logEntry := LogEntry{
-			ID: hit.ID,
+		logEntry := map[string]interface{}{
+			"id": hit.ID,
 		}
 
-		// Extract fields from _source
+		// Include all fields from _source
 		if source := hit.Source; source != nil {
-			if timestamp, ok := source["@timestamp"].(string); ok {
-				if ts, err := time.Parse(time.RFC3339, timestamp); err == nil {
-					logEntry.Timestamp = ts
-				}
-			}
-			if level, ok := source["level"].(string); ok {
-				logEntry.Level = level
-			}
-			if service, ok := source["service"].(string); ok {
-				logEntry.Service = service
-			}
-			if message, ok := source["message"].(string); ok {
-				logEntry.Message = message
-			}
-			if traceID, ok := source["trace_id"].(string); ok {
-				logEntry.TraceID = traceID
-			}
-			if fields, ok := source["fields"].(map[string]interface{}); ok {
-				logEntry.Fields = fields
+			// Add all source fields to the log entry
+			for key, value := range source {
+				logEntry[key] = value
 			}
 		}
 
@@ -808,11 +765,12 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 	}
 
 	response := map[string]interface{}{
-		"search_term": searchTerm,
-		"results":     results,
-		"total":       searchResult.Hits.Total.Value,
-		"limit":       limit,
-		"searched_at": time.Now().Format(time.RFC3339),
+		"search_term":   searchTerm,
+		"results":       results,
+		"total":         searchResult.Hits.Total.Value,
+		"limit":         limit,
+		"index_pattern": indexPattern,
+		"searched_at":   time.Now().Format(time.RFC3339),
 	}
 
 	data, err := json.Marshal(response)
@@ -845,14 +803,20 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 		}
 	}
 
-	// Build Elasticsearch query for specific pod logs
+	// Get index pattern - default to filebeat and logs indices if not specified
+	indexPattern := "*"
+	if val, ok := args["index"].(string); ok && val != "" {
+		indexPattern = val
+	}
+
+	// Build Elasticsearch query for specific pod logs - Fixed field names
 	podQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{
 					{
-						"term": map[string]interface{}{
-							"kubernetes.pod.name.keyword": podName,
+						"match": map[string]interface{}{
+							"k8s.pod": podName,
 						},
 					},
 				},
@@ -862,29 +826,58 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
-		"_source": []string{"@timestamp", "level", "message", "kubernetes.pod.name", "kubernetes.namespace.name", "kubernetes.container.name", "log"},
+		"_source": true,
 	}
 
 	// Add time range filter if specified
 	mustClauses := podQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
 
 	if startTime, ok := args["start_time"].(string); ok && startTime != "" {
+		// Parse start time to handle relative formats like "1h", "30m", etc.
+		parsedStartTime, err := parseTimeInput(startTime)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Invalid start_time format: %v", err),
+					},
+				},
+			}, nil
+		}
+
 		timeFilter := map[string]interface{}{
 			"range": map[string]interface{}{
 				"@timestamp": map[string]interface{}{
-					"gte": startTime,
+					"gte": parsedStartTime,
 				},
 			},
 		}
+
 		if endTime, ok := args["end_time"].(string); ok && endTime != "" {
-			timeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = endTime
+			// Parse end time as well
+			parsedEndTime, err := parseTimeInput(endTime)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid end_time format: %v", err),
+						},
+					},
+				}, nil
+			}
+			timeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = parsedEndTime
 		}
 		mustClauses = append(mustClauses, timeFilter)
 		podQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = mustClauses
 	}
 
-	// Execute search against logs indices
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*filebeat*,logs-*/_search", podQuery)
+	// Execute search against specified indices
+	searchPath := indexPattern + "/_search"
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, podQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -936,7 +929,7 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 		}, nil
 	}
 
-	// Convert Elasticsearch hits to structured log format
+	// Convert Elasticsearch hits to structured log format - Fixed field extraction
 	var results []map[string]interface{}
 	for _, hit := range searchResult.Hits.Hits {
 		logEntry := map[string]interface{}{
@@ -957,24 +950,25 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 			if log, ok := source["log"].(string); ok {
 				logEntry["log"] = log
 			}
+			if stream, ok := source["stream"].(string); ok {
+				logEntry["stream"] = stream
+			}
 
-			// Extract Kubernetes metadata
-			if k8s, ok := source["kubernetes"].(map[string]interface{}); ok {
-				if pod, ok := k8s["pod"].(map[string]interface{}); ok {
-					if podName, ok := pod["name"].(string); ok {
-						logEntry["pod_name"] = podName
-					}
-				}
-				if namespace, ok := k8s["namespace"].(map[string]interface{}); ok {
-					if nsName, ok := namespace["name"].(string); ok {
-						logEntry["namespace"] = nsName
-					}
-				}
-				if container, ok := k8s["container"].(map[string]interface{}); ok {
-					if containerName, ok := container["name"].(string); ok {
-						logEntry["container"] = containerName
-					}
-				}
+			// Extract K8s metadata using correct field names
+			if podName, ok := source["k8s.pod"].(string); ok {
+				logEntry["pod_name"] = podName
+			}
+			if namespace, ok := source["k8s.namespace"].(string); ok {
+				logEntry["namespace"] = namespace
+			}
+			if container, ok := source["k8s.container"].(string); ok {
+				logEntry["container"] = container
+			}
+			if node, ok := source["k8s.node"].(string); ok {
+				logEntry["node"] = node
+			}
+			if fields, ok := source["fields"].(map[string]interface{}); ok {
+				logEntry["fields"] = fields
 			}
 		}
 
@@ -982,11 +976,217 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 	}
 
 	response := map[string]interface{}{
-		"pod_name":    podName,
-		"results":     results,
-		"total":       searchResult.Hits.Total.Value,
-		"limit":       limit,
-		"searched_at": time.Now().Format(time.RFC3339),
+		"pod_name":      podName,
+		"results":       results,
+		"total":         searchResult.Hits.Total.Value,
+		"limit":         limit,
+		"index_pattern": indexPattern,
+		"searched_at":   time.Now().Format(time.RFC3339),
+	}
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(data),
+			},
+		},
+	}, nil
+}
+
+func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+
+	path, ok := args["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	var limit int = 100
+	if val, ok := args["limit"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			limit = parsed
+		}
+	}
+
+	// Get index pattern - default to all indices if not specified
+	indexPattern := "*"
+	if val, ok := args["index"].(string); ok && val != "" {
+		indexPattern = val
+	}
+
+	// Build Elasticsearch query for specific path logs
+	pathQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"path": path,
+						},
+					},
+				},
+			},
+		},
+		"size": limit,
+		"sort": []map[string]interface{}{
+			{"@timestamp": map[string]interface{}{"order": "desc"}},
+		},
+		"_source": true,
+	}
+
+	// Add HTTP method filter if specified
+	mustClauses := pathQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+
+	if method, ok := args["method"].(string); ok && method != "" {
+		methodFilter := map[string]interface{}{
+			"match": map[string]interface{}{
+				"request.method": strings.ToUpper(method),
+			},
+		}
+		mustClauses = append(mustClauses, methodFilter)
+	}
+
+	// Add status code filter if specified
+	if statusCode, ok := args["status_code"].(string); ok && statusCode != "" {
+		statusFilter := map[string]interface{}{
+			"match": map[string]interface{}{
+				"response.status_code": statusCode,
+			},
+		}
+		mustClauses = append(mustClauses, statusFilter)
+	}
+
+	// Add time range filter if specified
+	if startTime, ok := args["start_time"].(string); ok && startTime != "" {
+		// Parse start time to handle relative formats like "1h", "30m", etc.
+		parsedStartTime, err := parseTimeInput(startTime)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Invalid start_time format: %v", err),
+					},
+				},
+			}, nil
+		}
+
+		timeFilter := map[string]interface{}{
+			"range": map[string]interface{}{
+				"@timestamp": map[string]interface{}{
+					"gte": parsedStartTime,
+				},
+			},
+		}
+
+		if endTime, ok := args["end_time"].(string); ok && endTime != "" {
+			// Parse end time as well
+			parsedEndTime, err := parseTimeInput(endTime)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid end_time format: %v", err),
+						},
+					},
+				}, nil
+			}
+			timeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = parsedEndTime
+		}
+		mustClauses = append(mustClauses, timeFilter)
+	}
+
+	// Update the must clauses
+	pathQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = mustClauses
+
+	// Execute search against specified indices
+	searchPath := indexPattern + "/_search"
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, pathQuery)
+	if err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to search Elasticsearch for path logs: %v", err),
+				},
+			},
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to read response: %v", err),
+				},
+			},
+		}, nil
+	}
+
+	if resp.StatusCode != 200 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(body)),
+				},
+			},
+		}, nil
+	}
+
+	var searchResult ElasticsearchSearchResponse
+	if err := json.Unmarshal(body, &searchResult); err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to parse response: %v", err),
+				},
+			},
+		}, nil
+	}
+
+	// Convert Elasticsearch hits to structured log format
+	var results []map[string]interface{}
+	for _, hit := range searchResult.Hits.Hits {
+		logEntry := map[string]interface{}{
+			"id": hit.ID,
+		}
+
+		// Include all fields from _source
+		if source := hit.Source; source != nil {
+			// Add all source fields to the log entry
+			for key, value := range source {
+				logEntry[key] = value
+			}
+		}
+
+		results = append(results, logEntry)
+	}
+
+	response := map[string]interface{}{
+		"path":          path,
+		"results":       results,
+		"total":         searchResult.Hits.Total.Value,
+		"limit":         limit,
+		"index_pattern": indexPattern,
+		"searched_at":   time.Now().Format(time.RFC3339),
 	}
 
 	data, err := json.Marshal(response)
@@ -1050,11 +1250,11 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
-		"_source": []string{"@timestamp", "level", "service", "message", "trace_id", "fields"},
+		"_source": true,
 	}
 
 	// Execute search against logs indices
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", errorQuery)
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", "*/_search", errorQuery)
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -1106,34 +1306,18 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 		}, nil
 	}
 
-	// Convert Elasticsearch hits to LogEntry format
-	var errors []LogEntry
+	// Convert Elasticsearch hits to structured format with all fields
+	var errors []map[string]interface{}
 	for _, hit := range searchResult.Hits.Hits {
-		logEntry := LogEntry{
-			ID: hit.ID,
+		logEntry := map[string]interface{}{
+			"id": hit.ID,
 		}
 
-		// Extract fields from _source
+		// Include all fields from _source
 		if source := hit.Source; source != nil {
-			if timestamp, ok := source["@timestamp"].(string); ok {
-				if ts, err := time.Parse(time.RFC3339, timestamp); err == nil {
-					logEntry.Timestamp = ts
-				}
-			}
-			if level, ok := source["level"].(string); ok {
-				logEntry.Level = level
-			}
-			if service, ok := source["service"].(string); ok {
-				logEntry.Service = service
-			}
-			if message, ok := source["message"].(string); ok {
-				logEntry.Message = message
-			}
-			if traceID, ok := source["trace_id"].(string); ok {
-				logEntry.TraceID = traceID
-			}
-			if fields, ok := source["fields"].(map[string]interface{}); ok {
-				logEntry.Fields = fields
+			// Add all source fields to the log entry
+			for key, value := range source {
+				logEntry[key] = value
 			}
 		}
 
@@ -1146,158 +1330,6 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 		"limit":        limit,
 		"time_range":   fmt.Sprintf("%dh", hours),
 		"generated_at": time.Now().Format(time.RFC3339),
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func (m *Module) handleGetLogsByTraceID(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-
-	traceID, ok := args["trace_id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("trace_id is required")
-	}
-
-	// Build Elasticsearch query for logs with specific trace ID
-	traceQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"trace_id.keyword": traceID,
-			},
-		},
-		"size": 1000, // Get all logs for this trace
-		"sort": []map[string]interface{}{
-			{"@timestamp": map[string]interface{}{"order": "asc"}}, // Chronological order for trace
-		},
-		"_source": []string{"@timestamp", "level", "service", "message", "trace_id", "fields"},
-	}
-
-	// Execute search against logs indices
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "logs-*/_search", traceQuery)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to query Elasticsearch: %v", err),
-				},
-			},
-		}, nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to read response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	if resp.StatusCode != 200 {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(body)),
-				},
-			},
-		}, nil
-	}
-
-	var searchResult ElasticsearchSearchResponse
-	if err := json.Unmarshal(body, &searchResult); err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to parse response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	// Convert Elasticsearch hits to LogEntry format and collect services
-	var logs []LogEntry
-	servicesMap := make(map[string]bool)
-	var firstTimestamp, lastTimestamp time.Time
-
-	for i, hit := range searchResult.Hits.Hits {
-		logEntry := LogEntry{
-			ID: hit.ID,
-		}
-
-		// Extract fields from _source
-		if source := hit.Source; source != nil {
-			if timestamp, ok := source["@timestamp"].(string); ok {
-				if ts, err := time.Parse(time.RFC3339, timestamp); err == nil {
-					logEntry.Timestamp = ts
-					if i == 0 {
-						firstTimestamp = ts
-					}
-					lastTimestamp = ts
-				}
-			}
-			if level, ok := source["level"].(string); ok {
-				logEntry.Level = level
-			}
-			if service, ok := source["service"].(string); ok {
-				logEntry.Service = service
-				servicesMap[service] = true
-			}
-			if message, ok := source["message"].(string); ok {
-				logEntry.Message = message
-			}
-			if traceID, ok := source["trace_id"].(string); ok {
-				logEntry.TraceID = traceID
-			}
-			if fields, ok := source["fields"].(map[string]interface{}); ok {
-				logEntry.Fields = fields
-			}
-		}
-
-		logs = append(logs, logEntry)
-	}
-
-	// Calculate duration in milliseconds
-	var durationMs int64 = 0
-	if !firstTimestamp.IsZero() && !lastTimestamp.IsZero() {
-		durationMs = lastTimestamp.Sub(firstTimestamp).Milliseconds()
-	}
-
-	// Convert services map to slice
-	var services []string
-	for service := range servicesMap {
-		services = append(services, service)
-	}
-
-	response := map[string]interface{}{
-		"trace_id":    traceID,
-		"logs":        logs,
-		"total":       searchResult.Hits.Total.Value,
-		"duration_ms": durationMs,
-		"services":    services,
 	}
 
 	data, err := json.Marshal(response)
@@ -1793,4 +1825,54 @@ func (m *Module) handleGetShards(ctx context.Context, request mcp.CallToolReques
 			},
 		},
 	}, nil
+}
+
+// parseTimeInput converts relative time format (like "1h", "30m", "7d") to absolute ISO timestamp
+// or returns the input unchanged if it's already in absolute format
+func parseTimeInput(timeInput string) (string, error) {
+	if timeInput == "" {
+		return "", nil
+	}
+
+	// Check if it's already an absolute time (ISO format, epoch, etc.)
+	// If it contains 'T' or ':' or starts with digits and contains '-', it's likely absolute
+	if strings.Contains(timeInput, "T") || strings.Contains(timeInput, ":") ||
+		(len(timeInput) > 4 && strings.Contains(timeInput, "-") && timeInput[0] >= '0' && timeInput[0] <= '9') {
+		return timeInput, nil
+	}
+
+	// Parse relative time format like "1h", "30m", "7d"
+	re := regexp.MustCompile(`^(\d+)([smhdw])$`)
+	matches := re.FindStringSubmatch(timeInput)
+	if len(matches) != 3 {
+		// If it doesn't match relative format, return as-is and let Elasticsearch handle it
+		return timeInput, nil
+	}
+
+	value, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return "", fmt.Errorf("invalid time value: %s", matches[1])
+	}
+
+	unit := matches[2]
+	var duration time.Duration
+
+	switch unit {
+	case "s":
+		duration = time.Duration(value) * time.Second
+	case "m":
+		duration = time.Duration(value) * time.Minute
+	case "h":
+		duration = time.Duration(value) * time.Hour
+	case "d":
+		duration = time.Duration(value) * 24 * time.Hour
+	case "w":
+		duration = time.Duration(value) * 7 * 24 * time.Hour
+	default:
+		return "", fmt.Errorf("unsupported time unit: %s", unit)
+	}
+
+	// Calculate the absolute time (current time minus the duration for start_time)
+	absoluteTime := time.Now().Add(-duration)
+	return absoluteTime.Format(time.RFC3339), nil
 }
