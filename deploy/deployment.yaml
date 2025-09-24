@@ -42,7 +42,7 @@ spec:
               value: "true"
             - name: EVENTS_ENDPOINT
               value: "https://ops-server.your-company.com"
-            - name: EVENTS_API_TOKEN
+            - name: EVENTS_TOKEN
               value: ""
             - name: METRICS_ENABLED
               value: "true"
@@ -52,9 +52,15 @@ spec:
               value: "true"
             - name: LOGS_ELASTICSEARCH_ENDPOINT
               value: "https://elasticsearch.your-company.com"
-            - name: ELASTICSEARCH_USER
+            - name: LOGS_ELASTICSEARCH_USERNAME
               value: ""
-            - name: ELASTICSEARCH_PASSWORD
+            - name: LOGS_ELASTICSEARCH_PASSWORD
+              value: ""
+            - name: SOPS_ENABLED
+              value: "true"
+            - name: SOPS_ENDPOINT
+              value: "https://ops-server.your-company.com"
+            - name: SOPS_TOKEN
               value: ""
             - name: AUTH_ENABLED
               value: "false"

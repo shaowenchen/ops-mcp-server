@@ -1,10 +1,10 @@
 # Ops MCP Server
 
-A Model Context Protocol (MCP) server for operations tools, including event, metrics, and log management capabilities.
+A Model Context Protocol (MCP) server for operations tools, including event, metrics, log management, and standard operation procedures (SOPS) capabilities.
 
 ## Project Overview
 
-Ops MCP Server is a Go-based MCP server that provides operations data query capabilities for AI assistants (such as Claude, VS Code, etc.). Through the unified MCP protocol, AI assistants can directly query Kubernetes events, Prometheus metrics, and Elasticsearch logs.
+Ops MCP Server is a Go-based MCP server that provides operations data query capabilities for AI assistants (such as Claude, VS Code, etc.). Through the unified MCP protocol, AI assistants can directly query Kubernetes events, Prometheus metrics, Elasticsearch logs, and execute standard operation procedures (SOPS).
 
 ### Architecture Diagram
 
@@ -22,6 +22,7 @@ graph TB
             Events["Events Module<br/>(Kubernetes Events)"]
             Metrics["Metrics Module<br/>(Prometheus)"]
             Logs["Logs Module<br/>(Elasticsearch)"]
+            SOPS["SOPS Module<br/>(Standard Operations)"]
         end
 
         subgraph "Configuration"
@@ -41,6 +42,7 @@ graph TB
     Core --> Events
     Core --> Metrics
     Core --> Logs
+    Core --> SOPS
 
     Events -->|HTTPS| K8sAPI
     Metrics -->|HTTPS| Prometheus
@@ -65,6 +67,7 @@ graph TB
 - **🎯 Events Module**: Monitor Kubernetes events (pods, deployments, nodes)
 - **📊 Metrics Module**: Query Prometheus metrics and monitoring data
 - **📋 Logs Module**: Search and analyze logs through Elasticsearch
+- **⚙️ SOPS Module**: Execute standard operation procedures for infrastructure management
 
 ### Supported Tools
 
@@ -87,6 +90,10 @@ The server provides the following configurable MCP tools:
 - `search-logs` - Full-text search across log messages
 - `list-log-indices` - List all indices in the Elasticsearch cluster
 - `get-pod-logs` - Query logs for specific Kubernetes pods
+
+#### SOPS Tools
+
+- `execute-sops` - Execute standard operation procedures (SOPS) for infrastructure management
 
 ### Tool Naming Convention
 
@@ -115,7 +122,7 @@ server:
 events:
   enabled: true # Whether to enable events module
   endpoint: "https://ops-server.your-company.com/api/v1/events" # Events API endpoint
-  token: "${EVENTS_API_TOKEN}" # API token (supports environment variables)
+  token: "${EVENTS_TOKEN}" # API token (supports environment variables)
   tools:
     prefix: "" # Tool name prefix
     suffix: "-provided-by-nats" # Tool name suffix
@@ -138,9 +145,18 @@ logs:
     suffix: "-provided-by-elasticsearch" # Tool name suffix
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com:9200" # Elasticsearch endpoint
-    username: "${ELASTICSEARCH_USER}" # Username (supports environment variables)
-    password: "${ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
+    username: "${LOGS_LOGS_ELASTICSEARCH_USERNAMENAME}" # Username (supports environment variables)
+    password: "${LOGS_LOGS_ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
     timeout: 30 # Request timeout (seconds)
+
+# SOPS module configuration
+sops:
+  enabled: true # Whether to enable SOPS module
+  endpoint: "https://ops-server.your-company.com" # SOPS API endpoint
+  token: "${SOPS_TOKEN}" # API token (supports environment variables)
+  tools:
+    prefix: "" # Tool name prefix
+    suffix: "-provided-by-sops" # Tool name suffix
 ```
 
 ### Environment Variables
@@ -149,14 +165,15 @@ Set the following environment variables in production:
 
 ```bash
 # Events API configuration
-export EVENTS_API_TOKEN="your-events-api-token"
+export EVENTS_TOKEN="your-events-api-token"
+
+# SOPS API configuration
+export SOPS_TOKEN="your-sops-api-token"
 
 # Elasticsearch configuration
-export ELASTICSEARCH_USER="elastic"
-export ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
+export LOGS_LOGS_ELASTICSEARCH_USERNAMENAME="elastic"
+export LOGS_LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
 
-# Optional: Use API Key instead of username/password
-# export ELASTICSEARCH_API_KEY="your-api-key"
 
 # Optional: Prometheus authentication
 # export PROMETHEUS_TOKEN="your-prometheus-token"
@@ -189,6 +206,10 @@ With the above configuration, the actual tool names will be:
 - `list-log-indices-provided-by-elasticsearch`
 - `get-pod-logs-provided-by-elasticsearch`
 
+#### SOPS Tools
+
+- `execute-sops-provided-by-sops`
+
 To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
 
 ## Usage Guide
@@ -219,6 +240,13 @@ const logs = await mcpClient.callTool("search-logs-provided-by-elasticsearch", {
   limit: "50",
   time_range: "1h",
 });
+
+// Execute SOPS procedure
+const sopsResult = await mcpClient.callTool("execute-sops-provided-by-sops", {
+  sops_id: "deploy-application",
+  parameters: '{"app_name": "my-app", "version": "v1.2.3"}',
+  timeout: "30m",
+});
 ```
 
 ### Claude Desktop Integration Example
@@ -235,11 +263,11 @@ Using this MCP server in Claude Desktop:
         "--rm",
         "-i",
         "--env",
-        "EVENTS_API_TOKEN=your-token",
+        "EVENTS_TOKEN=your-token",
         "--env",
-        "ELASTICSEARCH_USER=elastic",
+        "LOGS_LOGS_ELASTICSEARCH_USERNAMENAME=elastic",
         "--env",
-        "ELASTICSEARCH_PASSWORD=your-password",
+        "LOGS_LOGS_ELASTICSEARCH_PASSWORD=your-password",
         "shaowenchen/ops-mcp-server:latest",
         "--enable-events",
         "--enable-metrics",
@@ -261,11 +289,12 @@ Using this MCP server in Claude Desktop:
 docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
-  -e EVENTS_API_TOKEN="your-events-api-token" \
-  -e ELASTICSEARCH_USER="elastic" \
-  -e ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e EVENTS_TOKEN="your-events-api-token" \
+  -e SOPS_TOKEN="your-sops-api-token" \
+  -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
+  -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
   shaowenchen/ops-mcp-server:latest \
-  --mode=sse --enable-events --enable-metrics --enable-logs
+  --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
 ```
 
 #### Docker with Custom Configuration
@@ -276,9 +305,10 @@ docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
   -v $(pwd)/configs/config.yaml:/runtime/configs/config.yaml \
-  -e EVENTS_API_TOKEN="your-events-api-token" \
-  -e ELASTICSEARCH_USER="elastic" \
-  -e ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e EVENTS_TOKEN="your-events-api-token" \
+  -e SOPS_TOKEN="your-sops-api-token" \
+  -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
+  -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
   shaowenchen/ops-mcp-server:latest \
   --config=./configs/config.yaml --mode=sse
 ```
@@ -295,11 +325,18 @@ services:
     environment:
       - OPS_MCP_ENV=production
       - OPS_MCP_LOG_LEVEL=info
-      - EVENTS_API_TOKEN=${EVENTS_API_TOKEN}
-      - ELASTICSEARCH_USER=${ELASTICSEARCH_USER}
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - EVENTS_TOKEN=${EVENTS_TOKEN}
+      - SOPS_TOKEN=${SOPS_TOKEN}
+      - LOGS_ELASTICSEARCH_USERNAME=${LOGS_ELASTICSEARCH_USERNAME}
+      - LOGS_ELASTICSEARCH_PASSWORD=${LOGS_ELASTICSEARCH_PASSWORD}
     command:
-      ["--mode=sse", "--enable-events", "--enable-metrics", "--enable-logs"]
+      [
+        "--mode=sse",
+        "--enable-events",
+        "--enable-metrics",
+        "--enable-logs",
+        "--enable-sops",
+      ]
     healthcheck:
       test:
         [
@@ -334,10 +371,10 @@ make dev-setup
 make build
 
 # Run server (stdio mode, for MCP clients)
-./bin/ops-mcp-server --enable-events --enable-metrics --enable-logs
+./bin/ops-mcp-server --enable-events --enable-metrics --enable-logs --enable-sops
 
 # Run server (SSE mode, for HTTP API)
-./bin/ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs
+./bin/ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
 ```
 
 #### Using Makefile
@@ -433,9 +470,10 @@ STDIO mode is suitable for direct MCP client integration (such as Claude Desktop
 --enable-events   # Enable events module
 --enable-metrics  # Enable metrics module
 --enable-logs     # Enable logs module
+--enable-sops     # Enable SOPS module
 
 # Usage example
-./ops-mcp-server --mode=sse --enable-all --port=8080 --log-level=debug
+./ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops --port=8080 --log-level=debug
 ```
 
 ## Development Guide
@@ -490,7 +528,7 @@ make lint fmt
 
 ```bash
 # Enable debug logging
-./ops-mcp-server --log-level=debug --enable-events --enable-metrics --enable-logs
+./ops-mcp-server --log-level=debug --enable-events --enable-metrics --enable-logs --enable-sops
 
 # View detailed request logs
 export LOG_LEVEL=debug

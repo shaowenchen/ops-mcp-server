@@ -9,6 +9,7 @@ type Config struct {
 	Events  EventsConfig  `mapstructure:"events" json:"events" yaml:"events"`
 	Metrics MetricsConfig `mapstructure:"metrics" json:"metrics" yaml:"metrics"`
 	Logs    LogsConfig    `mapstructure:"logs" json:"logs" yaml:"logs"`
+	SOPS    SOPSConfig    `mapstructure:"sops" json:"sops" yaml:"sops"`
 	SSE     SSEConfig     `mapstructure:"sse" json:"sse" yaml:"sse"`
 	Auth    AuthConfig    `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
@@ -73,6 +74,14 @@ type LogsElasticsearchConfig struct {
 type SSEConfig struct {
 	KeepAlive      time.Duration `mapstructure:"keepAlive" json:"keepAlive" yaml:"keepAlive"`
 	MaxConnections int           `mapstructure:"maxConnections" json:"maxConnections" yaml:"maxConnections"`
+}
+
+// SOPSConfig contains SOPS module configuration
+type SOPSConfig struct {
+	Enabled  bool        `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Tools    ToolsConfig `mapstructure:"tools" json:"tools" yaml:"tools"`
+	Endpoint string      `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Token    string      `mapstructure:"token" json:"token" yaml:"token"`
 }
 
 // AuthConfig contains authentication configuration

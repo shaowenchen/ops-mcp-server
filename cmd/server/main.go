@@ -18,6 +18,7 @@ import (
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
 	logsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/logs"
 	metricsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/metrics"
+	sopsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/sops"
 )
 
 var (
@@ -46,6 +47,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("enable-events", false, "Enable events module")
 	rootCmd.PersistentFlags().Bool("enable-metrics", false, "Enable metrics module")
 	rootCmd.PersistentFlags().Bool("enable-logs", false, "Enable logs module")
+	rootCmd.PersistentFlags().Bool("enable-sops", false, "Enable SOPS module")
 
 	// Bind flags to viper with unique keys
 	viper.BindPFlag("log.level", rootCmd.PersistentFlags().Lookup("log-level"))
@@ -55,6 +57,7 @@ func init() {
 	viper.BindPFlag("cli.events.enabled", rootCmd.PersistentFlags().Lookup("enable-events"))
 	viper.BindPFlag("cli.metrics.enabled", rootCmd.PersistentFlags().Lookup("enable-metrics"))
 	viper.BindPFlag("cli.logs.enabled", rootCmd.PersistentFlags().Lookup("enable-logs"))
+	viper.BindPFlag("cli.sops.enabled", rootCmd.PersistentFlags().Lookup("enable-sops"))
 }
 
 func initConfig() {
@@ -68,12 +71,15 @@ func initConfig() {
 	viper.BindEnv("log.level", "LOG_LEVEL")
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
+	viper.BindEnv("events.endpoint", "EVENTS_ENDPOINT")
 	viper.BindEnv("events.token", "EVENTS_TOKEN")
 	viper.BindEnv("metrics.prometheus.endpoint", "METRICS_PROMETHEUS_ENDPOINT")
 	viper.BindEnv("logs.elasticsearch.endpoint", "LOGS_ELASTICSEARCH_ENDPOINT")
 	viper.BindEnv("logs.elasticsearch.username", "LOGS_ELASTICSEARCH_USERNAME")
 	viper.BindEnv("logs.elasticsearch.password", "LOGS_ELASTICSEARCH_PASSWORD")
-	viper.BindEnv("logs.elasticsearch.apikey", "LOGS_ELASTICSEARCH_API_KEY")
+	viper.BindEnv("sops.endpoint", "SOPS_ENDPOINT")
+	viper.BindEnv("sops.token", "SOPS_TOKEN")
+	viper.BindEnv("server.mode", "SERVER_MODE")
 
 	// Load main config file first
 	if cfgFile != "" {
@@ -115,15 +121,38 @@ func runServer(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to unmarshal config", zap.Error(err))
 	}
 
-	// Override module enablement with CLI flags if provided (only if explicitly set by user)
-	if cmd.Flags().Changed("enable-events") {
-		cfg.Events.Enabled = viper.GetBool("cli.events.enabled")
-	}
-	if cmd.Flags().Changed("enable-metrics") {
-		cfg.Metrics.Enabled = viper.GetBool("cli.metrics.enabled")
-	}
-	if cmd.Flags().Changed("enable-logs") {
-		cfg.Logs.Enabled = viper.GetBool("cli.logs.enabled")
+	// Check if any enable flags were explicitly set
+	anyEnableFlagSet := cmd.Flags().Changed("enable-events") ||
+		cmd.Flags().Changed("enable-metrics") ||
+		cmd.Flags().Changed("enable-logs") ||
+		cmd.Flags().Changed("enable-sops")
+
+	// If no enable flags were set, enable all modules by default
+	if !anyEnableFlagSet {
+		cfg.Events.Enabled = true
+		cfg.Metrics.Enabled = true
+		cfg.Logs.Enabled = true
+		cfg.SOPS.Enabled = true
+	} else {
+		// If any enable flags were set, disable all modules first, then enable only the specified ones
+		cfg.Events.Enabled = false
+		cfg.Metrics.Enabled = false
+		cfg.Logs.Enabled = false
+		cfg.SOPS.Enabled = false
+
+		// Override module enablement with CLI flags if provided (only if explicitly set by user)
+		if cmd.Flags().Changed("enable-events") {
+			cfg.Events.Enabled = viper.GetBool("cli.events.enabled")
+		}
+		if cmd.Flags().Changed("enable-metrics") {
+			cfg.Metrics.Enabled = viper.GetBool("cli.metrics.enabled")
+		}
+		if cmd.Flags().Changed("enable-logs") {
+			cfg.Logs.Enabled = viper.GetBool("cli.logs.enabled")
+		}
+		if cmd.Flags().Changed("enable-sops") {
+			cfg.SOPS.Enabled = viper.GetBool("cli.sops.enabled")
+		}
 	}
 
 	// Get server mode - CLI flag takes precedence over config file
@@ -143,6 +172,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		zap.Bool("events_enabled", cfg.Events.Enabled),
 		zap.Bool("metrics_enabled", cfg.Metrics.Enabled),
 		zap.Bool("logs_enabled", cfg.Logs.Enabled),
+		zap.Bool("sops_enabled", cfg.SOPS.Enabled),
 	)
 
 	// Create MCP server
@@ -150,6 +180,11 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Register modules based on configuration
 	var toolCount int
+	var enabledTools []string
+	var eventsTools []string
+	var metricsTools []string
+	var logsTools []string
+	var sopsTools []string
 
 	if cfg.Events.Enabled {
 		// Create events module instance with configuration
@@ -168,13 +203,15 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 
 		// Register tools
-		eventsTools := eventsModuleInstance.GetTools()
-		for _, serverTool := range eventsTools {
+		eventsModuleTools := eventsModuleInstance.GetTools()
+		for _, serverTool := range eventsModuleTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
+			enabledTools = append(enabledTools, serverTool.Tool.Name)
+			eventsTools = append(eventsTools, serverTool.Tool.Name)
 			toolCount++
 		}
 
-		logger.Info("Events module enabled", zap.Int("tools", len(eventsTools)))
+		logger.Info("Events module enabled", zap.Int("tools", len(eventsModuleTools)), zap.Strings("tool_names", eventsTools))
 	}
 
 	if cfg.Metrics.Enabled {
@@ -199,13 +236,15 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 
 		// Register tools
-		metricsTools := metricsModuleInstance.GetTools()
-		for _, serverTool := range metricsTools {
+		metricsModuleTools := metricsModuleInstance.GetTools()
+		for _, serverTool := range metricsModuleTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
+			enabledTools = append(enabledTools, serverTool.Tool.Name)
+			metricsTools = append(metricsTools, serverTool.Tool.Name)
 			toolCount++
 		}
 
-		logger.Info("Metrics module enabled", zap.Int("tools", len(metricsTools)))
+		logger.Info("Metrics module enabled", zap.Int("tools", len(metricsModuleTools)), zap.Strings("tool_names", metricsTools))
 	}
 
 	if cfg.Logs.Enabled {
@@ -233,18 +272,76 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 
 		// Register tools
-		logsTools := logsModuleInstance.GetTools()
-		for _, serverTool := range logsTools {
+		logsModuleTools := logsModuleInstance.GetTools()
+		for _, serverTool := range logsModuleTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
+			enabledTools = append(enabledTools, serverTool.Tool.Name)
+			logsTools = append(logsTools, serverTool.Tool.Name)
 			toolCount++
 		}
 
-		logger.Info("Logs module enabled", zap.Int("tools", len(logsTools)))
+		logger.Info("Logs module enabled", zap.Int("tools", len(logsModuleTools)), zap.Strings("tool_names", logsTools))
+	}
+
+	if cfg.SOPS.Enabled {
+		// Create SOPS module instance with configuration
+		sopsConfig := &sopsModule.Config{
+			Endpoint: cfg.SOPS.Endpoint,
+			Token:    cfg.SOPS.Token,
+			Tools: sopsModule.ToolsConfig{
+				Prefix: cfg.SOPS.Tools.Prefix,
+				Suffix: cfg.SOPS.Tools.Suffix,
+			},
+		}
+		sopsModuleInstance, err := sopsModule.New(sopsConfig, logger)
+		if err != nil {
+			logger.Fatal("Failed to create SOPS module", zap.Error(err))
+		}
+
+		// Register tools
+		sopsModuleTools := sopsModuleInstance.GetTools()
+		for _, serverTool := range sopsModuleTools {
+			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
+			enabledTools = append(enabledTools, serverTool.Tool.Name)
+			sopsTools = append(sopsTools, serverTool.Tool.Name)
+			toolCount++
+		}
+
+		logger.Info("SOPS module enabled", zap.Int("tools", len(sopsModuleTools)), zap.Strings("tool_names", sopsTools))
 	}
 
 	if toolCount == 0 {
 		logger.Warn("No modules enabled, server will have no tools available")
 	} else {
+		// Print detailed module and tool information
+		logger.Info("=== Server Initialization Complete ===")
+		logger.Info("Enabled modules and tools:")
+
+		if cfg.Events.Enabled {
+			logger.Info("📡 Events Module", zap.String("status", "enabled"), zap.Strings("tools", eventsTools))
+		} else {
+			logger.Info("📡 Events Module", zap.String("status", "disabled"))
+		}
+
+		if cfg.Metrics.Enabled {
+			logger.Info("📊 Metrics Module", zap.String("status", "enabled"), zap.Strings("tools", metricsTools))
+		} else {
+			logger.Info("📊 Metrics Module", zap.String("status", "disabled"))
+		}
+
+		if cfg.Logs.Enabled {
+			logger.Info("📋 Logs Module", zap.String("status", "enabled"), zap.Strings("tools", logsTools))
+		} else {
+			logger.Info("📋 Logs Module", zap.String("status", "disabled"))
+		}
+
+		if cfg.SOPS.Enabled {
+			logger.Info("⚙️ SOPS Module", zap.String("status", "enabled"), zap.Strings("tools", sopsTools))
+		} else {
+			logger.Info("⚙️ SOPS Module", zap.String("status", "disabled"))
+		}
+
+		logger.Info("All available tools:", zap.Strings("tools", enabledTools))
 		logger.Info("Server initialized", zap.Int("total_tools", toolCount))
 	}
 
