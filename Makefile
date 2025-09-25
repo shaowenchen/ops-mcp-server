@@ -28,7 +28,6 @@ build:
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) ./$(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
-
 # Build for multiple platforms
 .PHONY: build-all
 build-all: clean
