@@ -21,6 +21,8 @@ go.work
 bin/
 build/
 dist/
+main
+__*
 
 # IDE and editor files
 .vscode/

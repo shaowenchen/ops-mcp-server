@@ -7,23 +7,25 @@ server:
   mode: sse
 
 sops:
-  enabled: true
-  endpoint: "https://ops-server.your-company.com"
-  token: "${SOPS_TOKEN}"
+  enabled: false
   tools:
     prefix: ""
     suffix: "-from-ops"
+  ops:
+    endpoint: "https://ops-server.your-company.com"
+    token: "${SOPS_OPS_TOKEN}"
 
 events:
-  enabled: true
-  endpoint: "https://ops-server.your-company.com"
-  token: "${EVENTS_TOKEN}"
+  enabled: false
   tools:
     prefix: ""
-    suffix: "-from-nats"
+    suffix: "-from-ops"
+  ops:
+    endpoint: "https://ops-server.your-company.com"
+    token: "${EVENTS_OPS_TOKEN}"
 
 metrics:
-  enabled: true
+  enabled: false
   tools:
     prefix: ""
     suffix: "-from-prometheus"
@@ -32,7 +34,7 @@ metrics:
     timeout: 30
 
 logs:
-  enabled: true
+  enabled: false
   tools:
     prefix: ""
     suffix: "-from-elasticsearch"
@@ -40,4 +42,13 @@ logs:
     endpoint: "https://elasticsearch.your-company.com"
     username: "${LOGS_ELASTICSEARCH_USERNAME}"
     password: "${LOGS_ELASTICSEARCH_PASSWORD}"
+    timeout: 30
+
+traces:
+  enabled: false
+  tools:
+    prefix: ""
+    suffix: "-from-jaeger"
+  jaeger:
+    endpoint: "https://jaeger.your-company.com"
     timeout: 30

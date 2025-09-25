@@ -35,35 +35,60 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          args:
+            - "--config=./configs/config.yaml"
+            - "--mode=sse"
+            - "--enable-sops"
+            - "--enable-events"
+            - "--enable-metrics"
+            - "--enable-logs"
+            - "--enable-traces"
           env:
+            # Server configuration
             - name: SERVER_MODE
               value: "sse"
+            - name: SERVER_HOST
+              value: "0.0.0.0"
+            - name: SERVER_PORT
+              value: "80"
+            - name: LOG_LEVEL
+              value: "info"
+            # Module enablement
+            - name: SOPS_ENABLED
+              value: "false"
             - name: EVENTS_ENABLED
-              value: "true"
-            - name: EVENTS_ENDPOINT
-              value: "https://ops-server.your-company.com"
-            - name: EVENTS_TOKEN
-              value: ""
+              value: "false"
             - name: METRICS_ENABLED
-              value: "true"
+              value: "false"
+            - name: LOGS_ENABLED
+              value: "false"
+            - name: TRACES_ENABLED
+              value: "false"
+            # SOPS module configuration
+            - name: SOPS_OPS_ENDPOINT
+              value: "https://ops-server.your-company.com"
+            - name: SOPS_OPS_TOKEN
+              value: ""
+            # Events module configuration
+            - name: EVENTS_OPS_ENDPOINT
+              value: "https://ops-server.your-company.com"
+            - name: EVENTS_OPS_TOKEN
+              value: ""
+            # Metrics module configuration
             - name: METRICS_PROMETHEUS_ENDPOINT
               value: "https://prometheus.your-company.com"
-            - name: LOGS_ENABLED
-              value: "true"
+            # Logs module configuration
             - name: LOGS_ELASTICSEARCH_ENDPOINT
               value: "https://elasticsearch.your-company.com"
             - name: LOGS_ELASTICSEARCH_USERNAME
               value: ""
             - name: LOGS_ELASTICSEARCH_PASSWORD
               value: ""
-            - name: SOPS_ENABLED
-              value: "true"
-            - name: SOPS_ENDPOINT
-              value: "https://ops-server.your-company.com"
-            - name: SOPS_TOKEN
-              value: ""
-            - name: AUTH_ENABLED
-              value: "false"
+            # Traces module configuration
+            - name: TRACES_JAEGER_ENDPOINT
+              value: "https://jaeger.your-company.com"
+            - name: TRACES_JAEGER_TIMEOUT
+              value: "30"
           resources:
             limits:
               cpu: 1

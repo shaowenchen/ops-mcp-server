@@ -6,10 +6,11 @@ import "time"
 type Config struct {
 	Log     LogConfig     `mapstructure:"log" json:"log" yaml:"log"`
 	Server  ServerConfig  `mapstructure:"server" json:"server" yaml:"server"`
+	Sops    SopsConfig    `mapstructure:"sops" json:"sops" yaml:"sops"`
 	Events  EventsConfig  `mapstructure:"events" json:"events" yaml:"events"`
 	Metrics MetricsConfig `mapstructure:"metrics" json:"metrics" yaml:"metrics"`
 	Logs    LogsConfig    `mapstructure:"logs" json:"logs" yaml:"logs"`
-	SOPS    SOPSConfig    `mapstructure:"sops" json:"sops" yaml:"sops"`
+	Traces  TracesConfig  `mapstructure:"traces" json:"traces" yaml:"traces"`
 	SSE     SSEConfig     `mapstructure:"sse" json:"sse" yaml:"sse"`
 	Auth    AuthConfig    `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
@@ -32,17 +33,23 @@ type ServerConfig struct {
 	Mode string `mapstructure:"mode" json:"mode" yaml:"mode"`
 }
 
+// EventsOpsConfig contains Ops backend configuration for events
+type EventsOpsConfig struct {
+	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Token    string `mapstructure:"token" json:"token" yaml:"token"`
+}
+
 // EventsConfig contains events module configuration
 type EventsConfig struct {
-	Enabled  bool        `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
-	Endpoint string      `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
-	Token    string      `mapstructure:"token" json:"token" yaml:"token"`
-	Tools    ToolsConfig `mapstructure:"tools" json:"tools" yaml:"tools"`
+	Enabled bool             `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Tools   ToolsConfig      `mapstructure:"tools" json:"tools" yaml:"tools"`
+	Ops     *EventsOpsConfig `mapstructure:"ops" json:"ops" yaml:"ops"`
 }
 
 // PrometheusConfig contains Prometheus configuration for metrics
 type PrometheusConfig struct {
 	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 
 // MetricsConfig contains metrics module configuration
@@ -56,8 +63,6 @@ type MetricsConfig struct {
 type LogsConfig struct {
 	Enabled       bool                     `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
 	Tools         ToolsConfig              `mapstructure:"tools" json:"tools" yaml:"tools"`
-	Backend       string                   `mapstructure:"backend" json:"backend" yaml:"backend"`
-	Endpoint      string                   `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
 	Elasticsearch *LogsElasticsearchConfig `mapstructure:"elasticsearch" json:"elasticsearch" yaml:"elasticsearch"`
 }
 
@@ -70,18 +75,36 @@ type LogsElasticsearchConfig struct {
 	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 
+// JaegerConfig contains Jaeger backend configuration for traces
+type JaegerConfig struct {
+	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
+}
+
+// TracesConfig contains traces module configuration
+type TracesConfig struct {
+	Enabled bool          `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Tools   ToolsConfig   `mapstructure:"tools" json:"tools" yaml:"tools"`
+	Jaeger  *JaegerConfig `mapstructure:"jaeger" json:"jaeger" yaml:"jaeger"`
+}
+
+// OpsConfig contains Ops backend configuration for Sops
+type OpsConfig struct {
+	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Token    string `mapstructure:"token" json:"token" yaml:"token"`
+}
+
+// SopsConfig contains Sops module configuration
+type SopsConfig struct {
+	Enabled bool        `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Tools   ToolsConfig `mapstructure:"tools" json:"tools" yaml:"tools"`
+	Ops     *OpsConfig  `mapstructure:"ops" json:"ops" yaml:"ops"`
+}
+
 // SSEConfig contains SSE configuration
 type SSEConfig struct {
 	KeepAlive      time.Duration `mapstructure:"keepAlive" json:"keepAlive" yaml:"keepAlive"`
 	MaxConnections int           `mapstructure:"maxConnections" json:"maxConnections" yaml:"maxConnections"`
-}
-
-// SOPSConfig contains SOPS module configuration
-type SOPSConfig struct {
-	Enabled  bool        `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
-	Tools    ToolsConfig `mapstructure:"tools" json:"tools" yaml:"tools"`
-	Endpoint string      `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
-	Token    string      `mapstructure:"token" json:"token" yaml:"token"`
 }
 
 // AuthConfig contains authentication configuration

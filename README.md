@@ -19,10 +19,10 @@ graph TB
         Core["MCP Core<br/>(Tool Registry)"]
 
         subgraph "Modules"
+            SOPS["SOPS Module<br/>(Standard Operations)"]
             Events["Events Module<br/>(Kubernetes Events)"]
             Metrics["Metrics Module<br/>(Prometheus)"]
             Logs["Logs Module<br/>(Elasticsearch)"]
-            SOPS["SOPS Module<br/>(Standard Operations)"]
         end
 
         subgraph "Configuration"
@@ -39,22 +39,25 @@ graph TB
 
     Client -.->|MCP Protocol| Server
     Server --> Core
+    Core --> SOPS
     Core --> Events
     Core --> Metrics
     Core --> Logs
-    Core --> SOPS
 
     Events -->|HTTPS| K8sAPI
     Metrics -->|HTTPS| Prometheus
     Logs -->|HTTPS| ES
 
+    Config --> SOPS
     Config --> Events
     Config --> Metrics
     Config --> Logs
+    Env --> SOPS
     Env --> Events
     Env --> Metrics
     Env --> Logs
 
+    SOPS -.->|"execute-sops"| Core
     Events -.->|"get-pod-events<br/>get-deployment-events<br/>get-node-events"| Core
     Metrics -.->|"list-metrics<br/>query-metrics<br/>query-metrics-range"| Core
     Logs -.->|"search-logs<br/>get-pod-logs<br/>list-log-indices"| Core
@@ -64,14 +67,19 @@ graph TB
 
 ### Core Modules
 
+- **⚙️ SOPS Module**: Execute standard operation procedures for infrastructure management
 - **🎯 Events Module**: Monitor Kubernetes events (pods, deployments, nodes)
 - **📊 Metrics Module**: Query Prometheus metrics and monitoring data
 - **📋 Logs Module**: Search and analyze logs through Elasticsearch
-- **⚙️ SOPS Module**: Execute standard operation procedures for infrastructure management
+- **🔍 Traces Module**: Query distributed traces and spans from Jaeger
 
 ### Supported Tools
 
 The server provides the following configurable MCP tools:
+
+#### SOPS Tools
+
+- `execute-sops` - Execute standard operation procedures (SOPS) for infrastructure management
 
 #### Events Tools
 
@@ -91,9 +99,12 @@ The server provides the following configurable MCP tools:
 - `list-log-indices` - List all indices in the Elasticsearch cluster
 - `get-pod-logs` - Query logs for specific Kubernetes pods
 
-#### SOPS Tools
+#### Traces Tools
 
-- `execute-sops` - Execute standard operation procedures (SOPS) for infrastructure management
+- `get-services` - Get service names as JSON array of string
+- `get-operations` - Get operations as JSON array of object with name and spanKind properties
+- `get-trace` - Get spans by trace ID in OpenTelemetry resource spans format
+- `find-traces` - Search spans as JSON array of object in OpenTelemetry resource spans format
 
 ### Tool Naming Convention
 
@@ -118,23 +129,34 @@ server:
   port: 80 # Server port
   mode: sse # Server mode: stdio or sse
 
+# SOPS module configuration
+sops:
+  enabled: true # Whether to enable SOPS module
+  tools:
+    prefix: "" # Tool name prefix
+    suffix: "-from-ops" # Tool name suffix
+  ops:
+    endpoint: "https://ops-server.your-company.com" # SOPS API endpoint
+    token: "${SOPS_TOKEN}" # API token (supports environment variables)
+
 # Events module configuration
 events:
   enabled: true # Whether to enable events module
-  endpoint: "https://ops-server.your-company.com/api/v1/events" # Events API endpoint
-  token: "${EVENTS_TOKEN}" # API token (supports environment variables)
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-nats" # Tool name suffix
+    suffix: "-from-ops" # Tool name suffix
+  ops:
+    endpoint: "https://ops-server.your-company.com" # Events API endpoint
+    token: "${EVENTS_OPS_TOKEN}" # API token (supports environment variables)
 
 # Metrics module configuration
 metrics:
   enabled: true # Whether to enable metrics module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-prometheus" # Tool name suffix
+    suffix: "-from-prometheus" # Tool name suffix
   prometheus:
-    endpoint: "https://prometheus.your-company.com/api/v1" # Prometheus API endpoint
+    endpoint: "https://prometheus.your-company.com" # Prometheus endpoint
     timeout: 30 # Request timeout (seconds)
 
 # Logs module configuration
@@ -142,37 +164,55 @@ logs:
   enabled: true # Whether to enable logs module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-elasticsearch" # Tool name suffix
+    suffix: "-from-elasticsearch" # Tool name suffix
   elasticsearch:
-    endpoint: "https://elasticsearch.your-company.com:9200" # Elasticsearch endpoint
-    username: "${LOGS_LOGS_ELASTICSEARCH_USERNAMENAME}" # Username (supports environment variables)
-    password: "${LOGS_LOGS_ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
+    endpoint: "https://elasticsearch.your-company.com" # Elasticsearch endpoint
+    username: "${LOGS_ELASTICSEARCH_USERNAME}" # Username (supports environment variables)
+    password: "${LOGS_ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
     timeout: 30 # Request timeout (seconds)
 
-# SOPS module configuration
-sops:
-  enabled: true # Whether to enable SOPS module
-  endpoint: "https://ops-server.your-company.com" # SOPS API endpoint
-  token: "${SOPS_TOKEN}" # API token (supports environment variables)
+# Traces module configuration
+traces:
+  enabled: true # Whether to enable traces module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-sops" # Tool name suffix
+    suffix: "-from-jaeger" # Tool name suffix
+  jaeger:
+    endpoint: "https://jaeger.your-company.com" # Jaeger API endpoint
+    timeout: 30 # Request timeout (seconds)
 ```
 
 ### Environment Variables
 
 Set the following environment variables in production:
 
+**Note**: 
+- Command line flags take precedence over environment variables. If both are specified, the command line flag value will be used.
+- By default, all modules are **disabled**. You need to explicitly enable modules using either command line flags or environment variables.
+
 ```bash
-# Events API configuration
-export EVENTS_TOKEN="your-events-api-token"
+# Module enablement (default: all disabled)
+export SOPS_ENABLED="true"
+export EVENTS_ENABLED="true"
+export METRICS_ENABLED="true"
+export LOGS_ENABLED="true"
+export TRACES_ENABLED="true"
 
 # SOPS API configuration
-export SOPS_TOKEN="your-sops-api-token"
+export SOPS_OPS_ENDPOINT="https://ops-server.your-company.com"
+export SOPS_OPS_TOKEN="your-sops-api-token"
+
+# Events API configuration
+export EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com"
+export EVENTS_OPS_TOKEN="your-events-api-token"
+
+# Traces configuration
+export TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com"
+export TRACES_JAEGER_TIMEOUT="30"
 
 # Elasticsearch configuration
-export LOGS_LOGS_ELASTICSEARCH_USERNAMENAME="elastic"
-export LOGS_LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
+export LOGS_ELASTICSEARCH_USERNAME="elastic"
+export LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
 
 
 # Optional: Prometheus authentication
@@ -188,27 +228,34 @@ export LOG_LEVEL="info"
 
 With the above configuration, the actual tool names will be:
 
+#### SOPS Tools
+
+- `execute-sops-from-ops`
+
 #### Events Tools
 
-- `get-pod-events-provided-by-nats`
-- `get-deployment-events-provided-by-nats`
-- `get-node-events-provided-by-nats`
+- `get-pod-events-from-ops`
+- `get-deployment-events-from-ops`
+- `get-node-events-from-ops`
 
 #### Metrics Tools
 
-- `list-metrics-provided-by-prometheus`
-- `query-metrics-provided-by-prometheus`
-- `query-metrics-range-provided-by-prometheus`
+- `list-metrics-from-prometheus`
+- `query-metrics-from-prometheus`
+- `query-metrics-range-from-prometheus`
 
 #### Logs Tools
 
-- `search-logs-provided-by-elasticsearch`
-- `list-log-indices-provided-by-elasticsearch`
-- `get-pod-logs-provided-by-elasticsearch`
+- `search-logs-from-elasticsearch`
+- `list-log-indices-from-elasticsearch`
+- `get-pod-logs-from-elasticsearch`
 
-#### SOPS Tools
+#### Traces Tools
 
-- `execute-sops-provided-by-sops`
+- `get-services-from-jaeger`
+- `get-operations-from-jaeger`
+- `get-trace-from-jaeger`
+- `find-traces-from-jaeger`
 
 To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
 
@@ -219,33 +266,38 @@ To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to 
 You can call tools with parameters (using the actual configured tool names):
 
 ```javascript
-// Execute metrics query
-const result = await mcpClient.callTool(
-  "query-metrics-provided-by-prometheus",
-  {
-    query: "count by (cluster) (up)",
-  }
-);
+// Execute SOPS procedure
+const sopsResult = await mcpClient.callTool("execute-sops-from-ops", {
+  sops_id: "deploy-application",
+  parameters: '{"app_name": "my-app", "version": "v1.2.3"}',
+  timeout: "30m",
+  dry_run: "false",
+});
 
 // Get Pod events
-const events = await mcpClient.callTool("get-pod-events-provided-by-nats", {
+const events = await mcpClient.callTool("get-pod-events-from-ops", {
   cluster: "production",
   namespace: "ai-nlp-fcheck",
   limit: "20",
 });
 
+// Execute metrics query
+const result = await mcpClient.callTool("query-metrics-from-prometheus", {
+  query: "count by (cluster) (up)",
+});
+
 // Search logs
-const logs = await mcpClient.callTool("search-logs-provided-by-elasticsearch", {
+const logs = await mcpClient.callTool("search-logs-from-elasticsearch", {
   search_term: "error",
   limit: "50",
   time_range: "1h",
 });
 
-// Execute SOPS procedure
-const sopsResult = await mcpClient.callTool("execute-sops-provided-by-sops", {
-  sops_id: "deploy-application",
-  parameters: '{"app_name": "my-app", "version": "v1.2.3"}',
-  timeout: "30m",
+// Query traces
+const traces = await mcpClient.callTool("find-traces-from-jaeger", {
+  service: "my-service",
+  operation: "my-operation",
+  limit: "10",
 });
 ```
 
@@ -263,15 +315,37 @@ Using this MCP server in Claude Desktop:
         "--rm",
         "-i",
         "--env",
-        "EVENTS_TOKEN=your-token",
+        "SOPS_ENABLED=true",
         "--env",
-        "LOGS_LOGS_ELASTICSEARCH_USERNAMENAME=elastic",
+        "SOPS_OPS_ENDPOINT=https://ops-server.your-company.com",
         "--env",
-        "LOGS_LOGS_ELASTICSEARCH_PASSWORD=your-password",
+        "SOPS_OPS_TOKEN=your-sops-token",
+        "--env",
+        "EVENTS_ENABLED=true",
+        "--env",
+        "EVENTS_OPS_ENDPOINT=https://ops-server.your-company.com",
+        "--env",
+        "EVENTS_OPS_TOKEN=your-events-token",
+        "--env",
+        "METRICS_ENABLED=true",
+        "--env",
+        "LOGS_ENABLED=true",
+        "--env",
+        "LOGS_ELASTICSEARCH_USERNAME=elastic",
+        "--env",
+        "LOGS_ELASTICSEARCH_PASSWORD=your-password",
+        "--env",
+        "TRACES_ENABLED=true",
+        "--env",
+        "TRACES_JAEGER_ENDPOINT=https://jaeger.your-company.com",
+        "--env",
+        "TRACES_JAEGER_TIMEOUT=30",
         "shaowenchen/ops-mcp-server:latest",
+        "--enable-sops",
         "--enable-events",
         "--enable-metrics",
-        "--enable-logs"
+        "--enable-logs",
+        "--enable-traces"
       ]
     }
   }
@@ -289,12 +363,21 @@ Using this MCP server in Claude Desktop:
 docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
-  -e EVENTS_TOKEN="your-events-api-token" \
-  -e SOPS_TOKEN="your-sops-api-token" \
+  -e SOPS_ENABLED="true" \
+  -e SOPS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e SOPS_OPS_TOKEN="your-sops-api-token" \
+  -e EVENTS_ENABLED="true" \
+  -e EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e EVENTS_OPS_TOKEN="your-events-api-token" \
+  -e METRICS_ENABLED="true" \
+  -e LOGS_ENABLED="true" \
   -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
   -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e TRACES_ENABLED="true" \
+  -e TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com" \
+  -e TRACES_JAEGER_TIMEOUT="30" \
   shaowenchen/ops-mcp-server:latest \
-  --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
+  --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 #### Docker with Custom Configuration
@@ -305,10 +388,19 @@ docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
   -v $(pwd)/configs/config.yaml:/runtime/configs/config.yaml \
-  -e EVENTS_TOKEN="your-events-api-token" \
-  -e SOPS_TOKEN="your-sops-api-token" \
+  -e SOPS_ENABLED="true" \
+  -e SOPS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e SOPS_OPS_TOKEN="your-sops-api-token" \
+  -e EVENTS_ENABLED="true" \
+  -e EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e EVENTS_OPS_TOKEN="your-events-api-token" \
+  -e METRICS_ENABLED="true" \
+  -e LOGS_ENABLED="true" \
   -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
   -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e TRACES_ENABLED="true" \
+  -e TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com" \
+  -e TRACES_JAEGER_TIMEOUT="30" \
   shaowenchen/ops-mcp-server:latest \
   --config=./configs/config.yaml --mode=sse
 ```
@@ -325,17 +417,27 @@ services:
     environment:
       - OPS_MCP_ENV=production
       - OPS_MCP_LOG_LEVEL=info
-      - EVENTS_TOKEN=${EVENTS_TOKEN}
-      - SOPS_TOKEN=${SOPS_TOKEN}
+      - SOPS_ENABLED=${SOPS_ENABLED}
+      - SOPS_OPS_ENDPOINT=${SOPS_OPS_ENDPOINT}
+      - SOPS_OPS_TOKEN=${SOPS_OPS_TOKEN}
+      - EVENTS_ENABLED=${EVENTS_ENABLED}
+      - EVENTS_OPS_ENDPOINT=${EVENTS_OPS_ENDPOINT}
+      - EVENTS_OPS_TOKEN=${EVENTS_OPS_TOKEN}
+      - METRICS_ENABLED=${METRICS_ENABLED}
+      - LOGS_ENABLED=${LOGS_ENABLED}
       - LOGS_ELASTICSEARCH_USERNAME=${LOGS_ELASTICSEARCH_USERNAME}
       - LOGS_ELASTICSEARCH_PASSWORD=${LOGS_ELASTICSEARCH_PASSWORD}
+      - TRACES_ENABLED=${TRACES_ENABLED}
+      - TRACES_JAEGER_ENDPOINT=${TRACES_JAEGER_ENDPOINT}
+      - TRACES_JAEGER_TIMEOUT=${TRACES_JAEGER_TIMEOUT}
     command:
       [
         "--mode=sse",
+        "--enable-sops",
         "--enable-events",
         "--enable-metrics",
         "--enable-logs",
-        "--enable-sops",
+        "--enable-traces",
       ]
     healthcheck:
       test:
@@ -371,10 +473,10 @@ make dev-setup
 make build
 
 # Run server (stdio mode, for MCP clients)
-./bin/ops-mcp-server --enable-events --enable-metrics --enable-logs --enable-sops
+./bin/ops-mcp-server --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 
 # Run server (SSE mode, for HTTP API)
-./bin/ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
+./bin/ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 #### Using Makefile
@@ -384,9 +486,11 @@ make build
 make quick  # Format, check, test, build
 
 # Run specific modules
+make run-sops      # Run SOPS module only
 make run-events    # Run events module only
 make run-metrics   # Run metrics module only
 make run-logs      # Run logs module only
+make run-traces  # Run traces module only
 make run-all       # Run all modules
 
 # Test MCP functionality
@@ -440,11 +544,13 @@ Health check response example:
   "timestamp": "2024-01-20T10:30:00Z",
   "mode": "sse",
   "modules": {
+    "sops": true,
     "events": true,
     "metrics": true,
-    "logs": true
+    "logs": true,
+    "traces": true
   },
-  "tools_count": 9
+  "tools_count": 14
 }
 ```
 
@@ -453,7 +559,7 @@ Health check response example:
 STDIO mode is suitable for direct MCP client integration (such as Claude Desktop):
 
 ```bash
-./ops-mcp-server --enable-events --enable-metrics --enable-logs
+./ops-mcp-server --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 ### Command Line Options
@@ -467,13 +573,14 @@ STDIO mode is suitable for direct MCP client integration (such as Claude Desktop
 --log-level       # Log level (debug|info|warn|error, default: info)
 
 # Module switches
+--enable-sops     # Enable SOPS module
 --enable-events   # Enable events module
 --enable-metrics  # Enable metrics module
 --enable-logs     # Enable logs module
---enable-sops     # Enable SOPS module
+--enable-traces # Enable traces module
 
 # Usage example
-./ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops --port=8080 --log-level=debug
+./ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces --port=8080 --log-level=debug
 ```
 
 ## Development Guide
@@ -486,9 +593,11 @@ ops-mcp-server/
 ├── pkg/
 │   ├── config/          # Configuration structure definitions
 │   ├── modules/         # Business modules
+│   │   ├── sops/        # SOPS module
 │   │   ├── events/      # Events module
 │   │   ├── metrics/     # Metrics module
-│   │   └── logs/        # Logs module
+│   │   ├── logs/        # Logs module
+│   │   └── traces/      # Traces module
 │   └── server/          # Server configuration
 ├── configs/             # Configuration files
 ├── deploy/              # Deployment configuration
