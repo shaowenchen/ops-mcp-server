@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/mark3labs/mcp-go v0.34.0
-	github.com/shaowenchen/ops v1.0.0
+	github.com/shaowenchen/ops v0.0.0-20250911072137-e8b73c7d805b
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	go.opentelemetry.io/otel v1.38.0

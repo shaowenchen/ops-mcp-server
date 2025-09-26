@@ -2,12 +2,13 @@ package log
 
 import (
 	"bytes"
-	"github.com/shaowenchen/ops/pkg/constants"
-	"github.com/shaowenchen/ops/pkg/utils"
 	"io"
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/shaowenchen/ops/pkg/constants"
+	"github.com/shaowenchen/ops/pkg/utils"
 )
 
 var Std *os.File = os.Stdout

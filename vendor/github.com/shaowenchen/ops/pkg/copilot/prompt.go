@@ -8,14 +8,16 @@ import (
 	opsv1 "github.com/shaowenchen/ops/api/v1"
 )
 
-func GetIntentionParametersPrompt(clusters []opsv1.Cluster, pipelines []opsv1.Pipeline) string {
-	return `{
-	"pipeline": "",
-	"variables": {}
-	}`
+func GetChatPrompt() string {
+	return `You are a DevOps expert.
+You excel at communicating with users and providing practical, actionable suggestions.
+Keep responses clear, concise, and to the point.
+Whenever possible, reply in the same language as the user's input.
+Support both English and Chinese users naturally.
+`
 }
 
-func GetIntentionPrompt(pipelines []opsv1.Pipeline) string {
+func GetPlanPrompt(pipelines []opsv1.Pipeline) string {
 	if len(pipelines) == 0 {
 		return ""
 	}
@@ -23,15 +25,40 @@ func GetIntentionPrompt(pipelines []opsv1.Pipeline) string {
 	for _, pipeline := range pipelines {
 		b.WriteString(fmt.Sprintf("- %s(%s)\n", pipeline.Name, pipeline.Spec.Desc))
 	}
-	return `Please select the most appropriate option to classify the intention of the user. 
-Don't ask any more questions, just select the option.
-If detected keyword 'action' in the input, usging action command to select the option.
+	return `You are an ops expert, you are good at planning tasks.
+Please do the following:
+-understand the user's input.
+-make a plan for the user's input.
+-output the plan in JSON format.
+
+< available standard operating procedures >
+` + b.String()
+}
+
+func GetIntentionParametersPrompt(clusters []opsv1.Cluster, pipelines []opsv1.Pipeline) string {
+	return `{
+	"pipeline": "",
+	"variables": {}
+	}`
+}
+
+func GetActionPrompt(pipelines []opsv1.Pipeline) string {
+	if len(pipelines) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, pipeline := range pipelines {
+		b.WriteString(fmt.Sprintf("- %s(%s)\n", pipeline.Name, pipeline.Spec.Desc))
+	}
+	return `Try to choose one of the following actions to resolve the input issue as effectively as possible.
+If input includes keyword action, please select the action option as possible.
+If you can't find the appropriate option, please choose the "other" option.
 Must be one of the following options:
 
 ` + b.String()
 }
 
-func GetParametersPrompt(pipeline opsv1.Pipeline, clusters []opsv1.Cluster) string {
+func GetActionParametersPrompt(pipeline opsv1.Pipeline, clusters []opsv1.Cluster) string {
 	// add vars
 	var desc strings.Builder
 	desc.WriteString(fmt.Sprintf("The %s pipeline is used to %s.\n", pipeline.Name, pipeline.Spec.Desc))

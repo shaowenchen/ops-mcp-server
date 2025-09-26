@@ -154,8 +154,8 @@ github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6g
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sashabaranov/go-openai v1.32.2 h1:8z9PfYaLPbRzmJIYpwcWu6z3XU8F+RwVMF1QRSeSF2M=
 github.com/sashabaranov/go-openai v1.32.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
-github.com/shaowenchen/ops v1.0.0 h1:nK+EwOWIx0mjo3glMMW+qZ3Kj5Qz+Q91PCpGUbhrm+Y=
-github.com/shaowenchen/ops v1.0.0/go.mod h1:uylVBLQh5N6o6Z1WMzVIk67TwAMuzWYo6zPea5+FVXM=
+github.com/shaowenchen/ops v0.0.0-20250911072137-e8b73c7d805b h1:MQvkNbFsFof48PV/Ak6Ru11WEKQWktv5bW78oYaJTww=
+github.com/shaowenchen/ops v0.0.0-20250911072137-e8b73c7d805b/go.mod h1:8yfAcK1zR3s1PqtjPqVFSGRm8CjrQfdhrTVIl0LWVbY=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=

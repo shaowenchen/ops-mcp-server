@@ -58,8 +58,8 @@ func (obj *TaskRun) GetHost(t *Task) string {
 	if t.Spec.Host != "" {
 		return t.Spec.Host
 	}
-	if _, ok := obj.Spec.Variables[opsconstants.Host]; ok {
-		return obj.Spec.Variables[opsconstants.Host]
+	if _, ok := obj.Spec.Variables[opsconstants.HostLower]; ok {
+		return obj.Spec.Variables[opsconstants.HostLower]
 	}
 	return ""
 }
@@ -100,7 +100,7 @@ func NewTaskRun(t *Task) TaskRun {
 		tr.OwnerReferences = []metav1.OwnerReference{
 			{
 				APIVersion: opsconstants.APIVersion,
-				Kind:       opsconstants.KindTask,
+				Kind:       opsconstants.Task,
 				Name:       t.Name,
 				UID:        t.UID,
 			},
@@ -117,7 +117,7 @@ func NewTaskRunWithPipelineRun(pr *PipelineRun, t *Task, tRef TaskRef) *TaskRun 
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: opsconstants.APIVersion,
-					Kind:       opsconstants.KindPipelineRun,
+					Kind:       opsconstants.PipelineRun,
 					Name:       pr.Name,
 					UID:        pr.UID,
 				},
