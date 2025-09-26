@@ -264,12 +264,16 @@ func runServer(cmd *cobra.Command, args []string) {
 	if cfg.Sops.Enabled {
 		// Create Sops module instance with configuration
 		sopsConfig := &sopsModule.Config{
-			Endpoint: cfg.Sops.Ops.Endpoint,
-			Token:    cfg.Sops.Ops.Token,
 			Tools: sopsModule.ToolsConfig{
 				Prefix: cfg.Sops.Tools.Prefix,
 				Suffix: cfg.Sops.Tools.Suffix,
 			},
+		}
+
+		// Add Ops configuration if available
+		if cfg.Sops.Ops != nil {
+			sopsConfig.Endpoint = cfg.Sops.Ops.Endpoint
+			sopsConfig.Token = cfg.Sops.Ops.Token
 		}
 		sopsModuleInstance, err := sopsModule.New(sopsConfig, logger)
 		if err != nil {
@@ -291,13 +295,17 @@ func runServer(cmd *cobra.Command, args []string) {
 	if cfg.Events.Enabled {
 		// Create events module instance with configuration
 		eventsConfig := &eventsModule.Config{
-			Endpoint:     cfg.Events.Ops.Endpoint,
-			Token:        cfg.Events.Ops.Token,
 			PollInterval: 30 * time.Second, // default poll interval
 			Tools: eventsModule.ToolsConfig{
 				Prefix: cfg.Events.Tools.Prefix,
 				Suffix: cfg.Events.Tools.Suffix,
 			},
+		}
+
+		// Add Ops configuration if available
+		if cfg.Events.Ops != nil {
+			eventsConfig.Endpoint = cfg.Events.Ops.Endpoint
+			eventsConfig.Token = cfg.Events.Ops.Token
 		}
 		eventsModuleInstance, err := eventsModule.New(eventsConfig, logger)
 		if err != nil {
@@ -464,8 +472,8 @@ func runServer(cmd *cobra.Command, args []string) {
 	case "stdio":
 		logger.Info("Starting server in stdio mode")
 		if err := server.ServeStdio(
-				mcpServer,
-			); err != nil {
+			mcpServer,
+		); err != nil {
 			logger.Fatal("Stdio server failed", zap.Error(err))
 		}
 	case "sse":

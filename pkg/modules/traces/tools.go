@@ -212,6 +212,11 @@ func (m *Module) buildFindTracesToolDefinition(config ToolConfig) mcp.Tool {
 
 // Tool handlers
 func (m *Module) handleGetServices(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Jaeger is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("Jaeger configuration not found - please set traces.jaeger.endpoint in config")
+	}
+
 	m.logger.Info("Getting services")
 
 	resp, err := m.makeJaegerRequest(ctx, "GET", "/api/services", nil)
@@ -270,6 +275,11 @@ func (m *Module) handleGetServices(ctx context.Context, request mcp.CallToolRequ
 }
 
 func (m *Module) handleGetOperations(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Jaeger is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("Jaeger configuration not found - please set traces.jaeger.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	service, ok := args["service"].(string)
@@ -352,6 +362,11 @@ func (m *Module) handleGetOperations(ctx context.Context, request mcp.CallToolRe
 }
 
 func (m *Module) handleGetTrace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Jaeger is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("Jaeger configuration not found - please set traces.jaeger.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	traceID, ok := args["traceId"].(string)
@@ -455,6 +470,11 @@ func (m *Module) handleGetTrace(ctx context.Context, request mcp.CallToolRequest
 }
 
 func (m *Module) handleFindTraces(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Jaeger is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("Jaeger configuration not found - please set traces.jaeger.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	serviceName, ok := args["serviceName"].(string)

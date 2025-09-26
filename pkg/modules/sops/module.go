@@ -32,11 +32,6 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
 
-	// Validate API configuration
-	if config.Endpoint == "" {
-		return nil, fmt.Errorf("SOPS API endpoint is required")
-	}
-
 	module := &Module{
 		config: config,
 		logger: logger,
@@ -46,9 +41,13 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		},
 	}
 
-	// Load SOPS configurations from API
-	if err := module.loadSOPSConfigsFromAPI(); err != nil {
-		return nil, fmt.Errorf("failed to load SOPS configs from API: %w", err)
+	// Load SOPS configurations from API only if endpoint is configured
+	if config.Endpoint != "" {
+		if err := module.loadSOPSConfigsFromAPI(); err != nil {
+			return nil, fmt.Errorf("failed to load SOPS configs from API: %w", err)
+		}
+	} else {
+		module.logger.Info("SOPS module created without API configuration - tools will return configuration required error")
 	}
 
 	return module, nil
@@ -89,6 +88,11 @@ func (m *Module) loadSOPSConfigsFromAPI() error {
 
 // handleExecuteSOPS handles the execution of a SOPS procedure
 func (m *Module) handleExecuteSOPS(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if SOPS API is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("SOPS API endpoint not configured - please set sops.ops.endpoint in config")
+	}
+
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid arguments format")
@@ -159,6 +163,11 @@ func (m *Module) executeSOPS(ctx context.Context, sopsID string, sops *SOPSConfi
 
 // handleListSOPS handles listing all available SOPS procedures
 func (m *Module) handleListSOPS(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if SOPS API is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("SOPS API endpoint not configured - please set sops.ops.endpoint in config")
+	}
+
 	// Get all available SOPS IDs and their descriptions
 	sopsList := make([]map[string]interface{}, 0, len(m.sops))
 	for id, config := range m.sops {

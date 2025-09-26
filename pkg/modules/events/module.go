@@ -54,6 +54,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		zap.String("endpoint", config.Endpoint),
 		zap.Duration("pollInterval", config.PollInterval),
 		zap.Bool("token_configured", config.Token != ""),
+		zap.Bool("ops_configured", config.Endpoint != ""),
 	)
 
 	return m, nil
@@ -61,6 +62,10 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 
 // makeRequest creates and executes an HTTP request with authentication (legacy method with path)
 func (m *Module) makeRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
+	// Check if endpoint is configured
+	if m.config.Endpoint == "" {
+		return nil, fmt.Errorf("events endpoint not configured - please set events.ops.endpoint in config")
+	}
 	url := m.config.Endpoint + path
 	return m.makeRequestWithFullURL(ctx, method, url, body)
 }

@@ -56,17 +56,20 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		}
 	}
 
-	// Build base URL
-	baseURL := config.Endpoint
-	if !strings.HasPrefix(baseURL, "http") {
-		if config.Protocol == "GRPC" {
-			baseURL = "http://" + baseURL
-		} else {
-			baseURL = "http://" + baseURL
+	// Build base URL only if endpoint is configured
+	var baseURL string
+	if config.Endpoint != "" {
+		baseURL = config.Endpoint
+		if !strings.HasPrefix(baseURL, "http") {
+			if config.Protocol == "GRPC" {
+				baseURL = "http://" + baseURL
+			} else {
+				baseURL = "http://" + baseURL
+			}
 		}
-	}
-	if !strings.Contains(baseURL, ":") {
-		baseURL = fmt.Sprintf("%s:%d", baseURL, config.Port)
+		if !strings.Contains(baseURL, ":") {
+			baseURL = fmt.Sprintf("%s:%d", baseURL, config.Port)
+		}
 	}
 
 	// Set default timeout if not specified
@@ -84,12 +87,16 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		baseURL: baseURL,
 	}
 
-	m.logger.Info("Jaeger module created",
-		zap.String("endpoint", config.Endpoint),
-		zap.String("protocol", config.Protocol),
-		zap.Int("port", config.Port),
-		zap.Int("timeout", config.Timeout),
-		zap.String("base_url", baseURL))
+	if config.Endpoint != "" {
+		m.logger.Info("Jaeger module created with Jaeger backend",
+			zap.String("endpoint", config.Endpoint),
+			zap.String("protocol", config.Protocol),
+			zap.Int("port", config.Port),
+			zap.Int("timeout", config.Timeout),
+			zap.String("base_url", baseURL))
+	} else {
+		m.logger.Info("Jaeger module created without Jaeger configuration - tools will return configuration required error")
+	}
 
 	return m, nil
 }

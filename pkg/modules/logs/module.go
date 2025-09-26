@@ -54,16 +54,10 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		return nil, fmt.Errorf("logs config is required")
 	}
 
-	// Validate elasticsearch configuration - required
-	if config.Elasticsearch == nil {
-		return nil, fmt.Errorf("elasticsearch configuration is required")
-	}
-	if config.Elasticsearch.Endpoint == "" {
-		return nil, fmt.Errorf("elasticsearch endpoint is required")
-	}
+	// Elasticsearch configuration is optional - module can be created without it
 
 	timeout := 30 * time.Second
-	if config.Elasticsearch.Timeout > 0 {
+	if config.Elasticsearch != nil && config.Elasticsearch.Timeout > 0 {
 		timeout = time.Duration(config.Elasticsearch.Timeout) * time.Second
 	}
 
@@ -75,10 +69,14 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		},
 	}
 
-	m.logger.Info("Logs module created with Elasticsearch backend",
-		zap.String("endpoint", config.Elasticsearch.Endpoint),
-		zap.Duration("timeout", timeout),
-	)
+	if config.Elasticsearch != nil && config.Elasticsearch.Endpoint != "" {
+		m.logger.Info("Logs module created with Elasticsearch backend",
+			zap.String("endpoint", config.Elasticsearch.Endpoint),
+			zap.Duration("timeout", timeout),
+		)
+	} else {
+		m.logger.Info("Logs module created without Elasticsearch configuration - tools will return configuration required error")
+	}
 
 	return m, nil
 }
@@ -98,6 +96,11 @@ func (m *Module) GetTools() []server.ServerTool {
 // Tool handlers
 
 func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Elasticsearch is configured
+	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
+		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	// Parse parameters
@@ -656,6 +659,11 @@ func (m *Module) handleGetLogLevels(ctx context.Context, request mcp.CallToolReq
 }
 
 func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Elasticsearch is configured
+	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
+		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	searchTerm, ok := args["search_term"].(string)
@@ -789,6 +797,11 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 }
 
 func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Elasticsearch is configured
+	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
+		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	podName, ok := args["pod"].(string)
@@ -1000,6 +1013,11 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 }
 
 func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Elasticsearch is configured
+	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
+		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	path, ok := args["path"].(string)
