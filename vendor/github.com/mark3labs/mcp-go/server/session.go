@@ -46,6 +46,17 @@ type SessionWithClientInfo interface {
 	GetClientInfo() mcp.Implementation
 	// SetClientInfo sets the client information for this session
 	SetClientInfo(clientInfo mcp.Implementation)
+	// GetClientCapabilities returns the client capabilities for this session
+	GetClientCapabilities() mcp.ClientCapabilities
+	// SetClientCapabilities sets the client capabilities for this session
+	SetClientCapabilities(clientCapabilities mcp.ClientCapabilities)
+}
+
+// SessionWithElicitation is an extension of ClientSession that can send elicitation requests
+type SessionWithElicitation interface {
+	ClientSession
+	// RequestElicitation sends an elicitation request to the client and waits for response
+	RequestElicitation(ctx context.Context, request mcp.ElicitationRequest) (*mcp.ElicitationResult, error)
 }
 
 // SessionWithStreamableHTTPConfig extends ClientSession to support streamable HTTP transport configurations
