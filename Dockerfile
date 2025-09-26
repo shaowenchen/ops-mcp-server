@@ -6,8 +6,6 @@ WORKDIR /builder
 
 COPY . .
 # Build the application
-RUN rm -rf go.sum
-RUN go mod tidy && go mod vendor
 RUN GO111MODULE=on CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
