@@ -4,10 +4,6 @@ on:
   push:
     branches: [master]
 
-env:
-  REGISTRY: docker.io
-  IMAGE_NAME: shaowenchen/ops-mcp-server
-
 jobs:
   build-docker:
     runs-on: ubuntu-latest
@@ -25,7 +21,6 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 

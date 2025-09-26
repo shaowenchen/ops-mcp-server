@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag)"
+        required: true
+        default: "latest"
+        type: string
+
+jobs:
+  GoReleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Set Tag Variable
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+      - name: Delete Latest Tag And Release
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
+        with:
+          delete_release: true
+          tag_name: ${{ steps.set-tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout Main
+        uses: actions/checkout@v3
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: ${{ steps.set-tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout Tag
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.set-tag.outputs.tag }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v3
+        with:
+          version: v0.173.2
+          args: release --skip-validate --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

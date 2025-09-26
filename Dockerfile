@@ -1,23 +1,14 @@
 # Multi-stage build for optimal image size
-FROM shaowenchen/builder-golang:1.23 AS builder
+FROM shaowenchen/builder-golang:1.24 AS builder
 
 # Set working directory to the default workspace
 WORKDIR /builder
 
 COPY . .
 
-# Build arguments for multi-arch support
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
-ARG VERSION=dev
-ARG BUILD_TIME=unknown
-
+RUN go mod tidy
 # Build the application
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
-    -ldflags="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
-    -a -installsuffix cgo \
-    -o ops-mcp-server \
-    ./cmd/server
+RUN GO111MODULE=on CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
 
@@ -29,7 +20,7 @@ RUN groupadd -g 1000 appgroup \
     && useradd -u 1000 -g appgroup -s /bin/bash -m appuser
 
 # Copy binary from builder stage
-COPY --from=builder /builder/ops-mcp-server .
+COPY --from=builder /builder/bin/ops-mcp-server .
 
 # Copy configuration files
 COPY --from=builder /builder/configs ./configs

@@ -14,11 +14,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/shaowenchen/ops-mcp-server/cmd/version"
 	"github.com/shaowenchen/ops-mcp-server/pkg/config"
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
 	logsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/logs"
 	metricsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/metrics"
 	sopsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/sops"
+	tracesModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/traces"
 )
 
 var (
@@ -27,14 +29,27 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ops-mcp-server",
-	Short: "Ops MCP Server - A modular operational monitoring server",
-	Long:  `A modular MCP server providing operational monitoring capabilities including events, metrics, and logs.`,
-	Run:   runServer,
+	Use:     "ops-mcp-server",
+	Short:   "Ops MCP Server - A modular operational monitoring server",
+	Long:    `A modular MCP server providing operational monitoring capabilities including events, metrics, and logs.`,
+	Run:     runServer,
+	Version: version.Short(),
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Long:  `Print detailed version information including build date, git commit, and platform.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.String())
+	},
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	// Add version command
+	rootCmd.AddCommand(versionCmd)
 
 	// Configuration flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is configs/config.yaml)")
@@ -44,20 +59,41 @@ func init() {
 	rootCmd.PersistentFlags().String("mode", "stdio", "Server mode: stdio or sse")
 
 	// Module flags with different names to avoid conflicts
-	rootCmd.PersistentFlags().Bool("enable-events", false, "Enable events module")
-	rootCmd.PersistentFlags().Bool("enable-metrics", false, "Enable metrics module")
-	rootCmd.PersistentFlags().Bool("enable-logs", false, "Enable logs module")
+	// SOPS module
 	rootCmd.PersistentFlags().Bool("enable-sops", false, "Enable SOPS module")
+
+	// Events module
+	rootCmd.PersistentFlags().Bool("enable-events", false, "Enable events module")
+
+	// Metrics module
+	rootCmd.PersistentFlags().Bool("enable-metrics", false, "Enable metrics module")
+
+	// Logs module
+	rootCmd.PersistentFlags().Bool("enable-logs", false, "Enable logs module")
+
+	// Traces module
+	rootCmd.PersistentFlags().Bool("enable-traces", false, "Enable traces module")
 
 	// Bind flags to viper with unique keys
 	viper.BindPFlag("log.level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.BindPFlag("server.host", rootCmd.PersistentFlags().Lookup("host"))
 	viper.BindPFlag("server.port", rootCmd.PersistentFlags().Lookup("port"))
 	viper.BindPFlag("server.mode", rootCmd.PersistentFlags().Lookup("mode"))
-	viper.BindPFlag("cli.events.enabled", rootCmd.PersistentFlags().Lookup("enable-events"))
-	viper.BindPFlag("cli.metrics.enabled", rootCmd.PersistentFlags().Lookup("enable-metrics"))
-	viper.BindPFlag("cli.logs.enabled", rootCmd.PersistentFlags().Lookup("enable-logs"))
+
+	// SOPS module bindings
 	viper.BindPFlag("cli.sops.enabled", rootCmd.PersistentFlags().Lookup("enable-sops"))
+
+	// Events module bindings
+	viper.BindPFlag("cli.events.enabled", rootCmd.PersistentFlags().Lookup("enable-events"))
+
+	// Metrics module bindings
+	viper.BindPFlag("cli.metrics.enabled", rootCmd.PersistentFlags().Lookup("enable-metrics"))
+
+	// Logs module bindings
+	viper.BindPFlag("cli.logs.enabled", rootCmd.PersistentFlags().Lookup("enable-logs"))
+
+	// Traces module bindings
+	viper.BindPFlag("cli.traces.enabled", rootCmd.PersistentFlags().Lookup("enable-traces"))
 }
 
 func initConfig() {
@@ -71,15 +107,23 @@ func initConfig() {
 	viper.BindEnv("log.level", "LOG_LEVEL")
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
-	viper.BindEnv("events.endpoint", "EVENTS_ENDPOINT")
-	viper.BindEnv("events.token", "EVENTS_TOKEN")
+	viper.BindEnv("server.mode", "SERVER_MODE")
+	viper.BindEnv("sops.ops.endpoint", "SOPS_OPS_ENDPOINT")
+	viper.BindEnv("sops.ops.token", "SOPS_OPS_TOKEN")
+	viper.BindEnv("events.ops.endpoint", "EVENTS_OPS_ENDPOINT")
+	viper.BindEnv("events.ops.token", "EVENTS_OPS_TOKEN")
 	viper.BindEnv("metrics.prometheus.endpoint", "METRICS_PROMETHEUS_ENDPOINT")
 	viper.BindEnv("logs.elasticsearch.endpoint", "LOGS_ELASTICSEARCH_ENDPOINT")
 	viper.BindEnv("logs.elasticsearch.username", "LOGS_ELASTICSEARCH_USERNAME")
 	viper.BindEnv("logs.elasticsearch.password", "LOGS_ELASTICSEARCH_PASSWORD")
-	viper.BindEnv("sops.endpoint", "SOPS_ENDPOINT")
-	viper.BindEnv("sops.token", "SOPS_TOKEN")
-	viper.BindEnv("server.mode", "SERVER_MODE")
+	viper.BindEnv("traces.jaeger.endpoint", "TRACES_JAEGER_ENDPOINT")
+	viper.BindEnv("traces.jaeger.timeout", "TRACES_JAEGER_TIMEOUT")
+	// Module enablement environment variables
+	viper.BindEnv("sops.enabled", "SOPS_ENABLED")
+	viper.BindEnv("events.enabled", "EVENTS_ENABLED")
+	viper.BindEnv("metrics.enabled", "METRICS_ENABLED")
+	viper.BindEnv("logs.enabled", "LOGS_ENABLED")
+	viper.BindEnv("traces.enabled", "TRACES_ENABLED")
 
 	// Load main config file first
 	if cfgFile != "" {
@@ -121,37 +165,66 @@ func runServer(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to unmarshal config", zap.Error(err))
 	}
 
-	// Check if any enable flags were explicitly set
-	anyEnableFlagSet := cmd.Flags().Changed("enable-events") ||
-		cmd.Flags().Changed("enable-metrics") ||
-		cmd.Flags().Changed("enable-logs") ||
-		cmd.Flags().Changed("enable-sops")
+	// Module enablement logic: CLI flags take precedence over environment variables
+	// If CLI flag is set, use CLI value; otherwise use environment variable; otherwise use default (false)
 
-	// If no enable flags were set, enable all modules by default
-	if !anyEnableFlagSet {
-		cfg.Events.Enabled = true
-		cfg.Metrics.Enabled = true
-		cfg.Logs.Enabled = true
-		cfg.SOPS.Enabled = true
+	// Sops module
+	if cmd.Flags().Changed("enable-sops") {
+		// CLI flag takes precedence
+		cfg.Sops.Enabled = viper.GetBool("cli.sops.enabled")
 	} else {
-		// If any enable flags were set, disable all modules first, then enable only the specified ones
-		cfg.Events.Enabled = false
-		cfg.Metrics.Enabled = false
-		cfg.Logs.Enabled = false
-		cfg.SOPS.Enabled = false
+		// Use environment variable or default to false
+		cfg.Sops.Enabled = viper.GetBool("sops.enabled")
+		if !viper.IsSet("sops.enabled") {
+			cfg.Sops.Enabled = false // default
+		}
+	}
 
-		// Override module enablement with CLI flags if provided (only if explicitly set by user)
-		if cmd.Flags().Changed("enable-events") {
-			cfg.Events.Enabled = viper.GetBool("cli.events.enabled")
+	// Events module
+	if cmd.Flags().Changed("enable-events") {
+		// CLI flag takes precedence
+		cfg.Events.Enabled = viper.GetBool("cli.events.enabled")
+	} else {
+		// Use environment variable or default to false
+		cfg.Events.Enabled = viper.GetBool("events.enabled")
+		if !viper.IsSet("events.enabled") {
+			cfg.Events.Enabled = false // default
 		}
-		if cmd.Flags().Changed("enable-metrics") {
-			cfg.Metrics.Enabled = viper.GetBool("cli.metrics.enabled")
+	}
+
+	// Metrics module
+	if cmd.Flags().Changed("enable-metrics") {
+		// CLI flag takes precedence
+		cfg.Metrics.Enabled = viper.GetBool("cli.metrics.enabled")
+	} else {
+		// Use environment variable or default to false
+		cfg.Metrics.Enabled = viper.GetBool("metrics.enabled")
+		if !viper.IsSet("metrics.enabled") {
+			cfg.Metrics.Enabled = false // default
 		}
-		if cmd.Flags().Changed("enable-logs") {
-			cfg.Logs.Enabled = viper.GetBool("cli.logs.enabled")
+	}
+
+	// Logs module
+	if cmd.Flags().Changed("enable-logs") {
+		// CLI flag takes precedence
+		cfg.Logs.Enabled = viper.GetBool("cli.logs.enabled")
+	} else {
+		// Use environment variable or default to false
+		cfg.Logs.Enabled = viper.GetBool("logs.enabled")
+		if !viper.IsSet("logs.enabled") {
+			cfg.Logs.Enabled = false // default
 		}
-		if cmd.Flags().Changed("enable-sops") {
-			cfg.SOPS.Enabled = viper.GetBool("cli.sops.enabled")
+	}
+
+	// Traces module
+	if cmd.Flags().Changed("enable-traces") {
+		// CLI flag takes precedence
+		cfg.Traces.Enabled = viper.GetBool("cli.traces.enabled")
+	} else {
+		// Use environment variable or default to false
+		cfg.Traces.Enabled = viper.GetBool("traces.enabled")
+		if !viper.IsSet("traces.enabled") {
+			cfg.Traces.Enabled = false // default
 		}
 	}
 
@@ -169,28 +242,57 @@ func runServer(cmd *cobra.Command, args []string) {
 		zap.String("mode", serverMode),
 		zap.String("host", cfg.Server.Host),
 		zap.Int("port", cfg.Server.Port),
+		zap.Bool("sops_enabled", cfg.Sops.Enabled),
 		zap.Bool("events_enabled", cfg.Events.Enabled),
 		zap.Bool("metrics_enabled", cfg.Metrics.Enabled),
 		zap.Bool("logs_enabled", cfg.Logs.Enabled),
-		zap.Bool("sops_enabled", cfg.SOPS.Enabled),
+		zap.Bool("traces_enabled", cfg.Traces.Enabled),
 	)
 
 	// Create MCP server
-	mcpServer := server.NewMCPServer("ops-mcp-server", "1.0.0")
+	mcpServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
 
 	// Register modules based on configuration
 	var toolCount int
 	var enabledTools []string
+	var sopsTools []string
 	var eventsTools []string
 	var metricsTools []string
 	var logsTools []string
-	var sopsTools []string
+	var tracesTools []string
+
+	if cfg.Sops.Enabled {
+		// Create Sops module instance with configuration
+		sopsConfig := &sopsModule.Config{
+			Endpoint: cfg.Sops.Ops.Endpoint,
+			Token:    cfg.Sops.Ops.Token,
+			Tools: sopsModule.ToolsConfig{
+				Prefix: cfg.Sops.Tools.Prefix,
+				Suffix: cfg.Sops.Tools.Suffix,
+			},
+		}
+		sopsModuleInstance, err := sopsModule.New(sopsConfig, logger)
+		if err != nil {
+			logger.Fatal("Failed to create SOPS module", zap.Error(err))
+		}
+
+		// Register tools
+		sopsModuleTools := sopsModuleInstance.GetTools()
+		for _, serverTool := range sopsModuleTools {
+			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
+			enabledTools = append(enabledTools, serverTool.Tool.Name)
+			sopsTools = append(sopsTools, serverTool.Tool.Name)
+			toolCount++
+		}
+
+		logger.Info("SOPS module enabled", zap.Int("tools", len(sopsModuleTools)), zap.Strings("tool_names", sopsTools))
+	}
 
 	if cfg.Events.Enabled {
 		// Create events module instance with configuration
 		eventsConfig := &eventsModule.Config{
-			Endpoint:     cfg.Events.Endpoint,
-			Token:        cfg.Events.Token,
+			Endpoint:     cfg.Events.Ops.Endpoint,
+			Token:        cfg.Events.Ops.Token,
 			PollInterval: 30 * time.Second, // default poll interval
 			Tools: eventsModule.ToolsConfig{
 				Prefix: cfg.Events.Tools.Prefix,
@@ -283,31 +385,37 @@ func runServer(cmd *cobra.Command, args []string) {
 		logger.Info("Logs module enabled", zap.Int("tools", len(logsModuleTools)), zap.Strings("tool_names", logsTools))
 	}
 
-	if cfg.SOPS.Enabled {
-		// Create SOPS module instance with configuration
-		sopsConfig := &sopsModule.Config{
-			Endpoint: cfg.SOPS.Endpoint,
-			Token:    cfg.SOPS.Token,
-			Tools: sopsModule.ToolsConfig{
-				Prefix: cfg.SOPS.Tools.Prefix,
-				Suffix: cfg.SOPS.Tools.Suffix,
+	if cfg.Traces.Enabled {
+		// Create Jaeger module instance with configuration
+		tracesConfig := &tracesModule.Config{
+			Tools: tracesModule.ToolsConfig{
+				Prefix: cfg.Traces.Tools.Prefix,
+				Suffix: cfg.Traces.Tools.Suffix,
 			},
 		}
-		sopsModuleInstance, err := sopsModule.New(sopsConfig, logger)
+
+		// Add Jaeger configuration if available
+		if cfg.Traces.Jaeger != nil {
+			tracesConfig.Endpoint = cfg.Traces.Jaeger.Endpoint
+			tracesConfig.Protocol = "HTTP" // default protocol
+			tracesConfig.Port = 16686      // default port
+			tracesConfig.Timeout = cfg.Traces.Jaeger.Timeout
+		}
+		tracesModuleInstance, err := tracesModule.New(tracesConfig, logger)
 		if err != nil {
-			logger.Fatal("Failed to create SOPS module", zap.Error(err))
+			logger.Fatal("Failed to create Jaeger module", zap.Error(err))
 		}
 
 		// Register tools
-		sopsModuleTools := sopsModuleInstance.GetTools()
-		for _, serverTool := range sopsModuleTools {
+		tracesModuleTools := tracesModuleInstance.GetTools()
+		for _, serverTool := range tracesModuleTools {
 			mcpServer.AddTool(serverTool.Tool, serverTool.Handler)
 			enabledTools = append(enabledTools, serverTool.Tool.Name)
-			sopsTools = append(sopsTools, serverTool.Tool.Name)
+			tracesTools = append(tracesTools, serverTool.Tool.Name)
 			toolCount++
 		}
 
-		logger.Info("SOPS module enabled", zap.Int("tools", len(sopsModuleTools)), zap.Strings("tool_names", sopsTools))
+		logger.Info("Traces module enabled", zap.Int("tools", len(tracesModuleTools)), zap.Strings("tool_names", tracesTools))
 	}
 
 	if toolCount == 0 {
@@ -316,6 +424,12 @@ func runServer(cmd *cobra.Command, args []string) {
 		// Print detailed module and tool information
 		logger.Info("=== Server Initialization Complete ===")
 		logger.Info("Enabled modules and tools:")
+
+		if cfg.Sops.Enabled {
+			logger.Info("⚙️ Sops Module", zap.String("status", "enabled"), zap.Strings("tools", sopsTools))
+		} else {
+			logger.Info("⚙️ Sops Module", zap.String("status", "disabled"))
+		}
 
 		if cfg.Events.Enabled {
 			logger.Info("📡 Events Module", zap.String("status", "enabled"), zap.Strings("tools", eventsTools))
@@ -335,10 +449,10 @@ func runServer(cmd *cobra.Command, args []string) {
 			logger.Info("📋 Logs Module", zap.String("status", "disabled"))
 		}
 
-		if cfg.SOPS.Enabled {
-			logger.Info("⚙️ SOPS Module", zap.String("status", "enabled"), zap.Strings("tools", sopsTools))
+		if cfg.Traces.Enabled {
+			logger.Info("🔍 Traces Module", zap.String("status", "enabled"), zap.Strings("tools", tracesTools))
 		} else {
-			logger.Info("⚙️ SOPS Module", zap.String("status", "disabled"))
+			logger.Info("🔍 Traces Module", zap.String("status", "disabled"))
 		}
 
 		logger.Info("All available tools:", zap.Strings("tools", enabledTools))
@@ -366,16 +480,21 @@ func runServer(cmd *cobra.Command, args []string) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 
+			versionInfo := version.Get()
 			healthResponse := map[string]interface{}{
-				"status":    "ok",
-				"service":   "ops-mcp-server",
-				"version":   "1.0.0",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
-				"mode":      serverMode,
+				"status":     "ok",
+				"service":    "ops-mcp-server",
+				"version":    versionInfo.Version,
+				"build_date": versionInfo.BuildDate,
+				"git_commit": versionInfo.GitCommit,
+				"timestamp":  time.Now().UTC().Format(time.RFC3339),
+				"mode":       serverMode,
 				"modules": map[string]bool{
+					"sops":    cfg.Sops.Enabled,
 					"events":  cfg.Events.Enabled,
 					"metrics": cfg.Metrics.Enabled,
 					"logs":    cfg.Logs.Enabled,
+					"traces":  cfg.Traces.Enabled,
 				},
 				"tools_count": toolCount,
 			}

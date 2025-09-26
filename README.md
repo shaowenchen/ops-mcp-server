@@ -1,99 +1,201 @@
 # Ops MCP Server
 
-A Model Context Protocol (MCP) server for operations tools, including event, metrics, log management, and standard operation procedures (SOPS) capabilities.
+🚀 **Enterprise-Grade AI Operations Assistant** - A comprehensive Model Context Protocol (MCP) server that bridges AI assistants with your entire observability stack.
 
-## Project Overview
+## 🎯 Project Vision
 
-Ops MCP Server is a Go-based MCP server that provides operations data query capabilities for AI assistants (such as Claude, VS Code, etc.). Through the unified MCP protocol, AI assistants can directly query Kubernetes events, Prometheus metrics, Elasticsearch logs, and execute standard operation procedures (SOPS).
+**Transform AI assistants into intelligent operations engineers** by providing seamless access to your Kubernetes clusters, monitoring systems, logging infrastructure, and operational procedures through a unified, secure, and scalable MCP interface.
 
-### Architecture Diagram
+## 📋 Project Overview
+
+Ops MCP Server is a production-ready, Go-based MCP server that empowers AI assistants (Claude, VS Code, Cursor, etc.) to become your intelligent operations co-pilot. By implementing the Model Context Protocol standard, it provides a secure, unified gateway to your entire observability ecosystem:
+
+- **🔍 Real-time Kubernetes Operations**: Monitor pods, deployments, nodes, and cluster events
+- **📊 Advanced Metrics Intelligence**: Query Prometheus metrics with natural language
+- **📋 Comprehensive Log Analysis**: Search and analyze logs across Elasticsearch clusters  
+- **🔧 Automated Operations**: Execute standard operating procedures (SOPS) safely
+- **🌐 Distributed Tracing**: Investigate performance issues with Jaeger integration
+
+## 🏗️ System Architecture
 
 ```mermaid
 graph TB
-    subgraph "MCP Client"
-        Client["MCP Client<br/>(Claude, VS Code, etc.)"]
+    subgraph "🤖 AI Assistant Layer"
+        Claude["Claude Desktop"]
+        VSCode["VS Code"]
+        Cursor["Cursor IDE"]
+        Other["Other MCP Clients"]
     end
 
-    subgraph "Ops MCP Server"
-        Server["HTTP/SSE Server<br/>:80"]
-        Core["MCP Core<br/>(Tool Registry)"]
+    subgraph "🔌 MCP Protocol Layer"
+        MCP["Model Context Protocol<br/>(JSON-RPC 2.0)"]
+    end
 
-        subgraph "Modules"
-            Events["Events Module<br/>(Kubernetes Events)"]
-            Metrics["Metrics Module<br/>(Prometheus)"]
-            Logs["Logs Module<br/>(Elasticsearch)"]
-            SOPS["SOPS Module<br/>(Standard Operations)"]
+    subgraph "🚀 Ops MCP Server"
+        subgraph "🌐 Transport Layer"
+            HTTP["HTTP/SSE Server<br/>:80"]
+            STDIO["STDIO Interface"]
+        end
+        
+        subgraph "🧠 Core Engine"
+            Router["Request Router"]
+            Auth["Authentication<br/>& Authorization"]
+            Cache["Response Cache"]
+            Logger["Structured Logging"]
         end
 
-        subgraph "Configuration"
-            Config["config.yaml<br/>(Tool naming, endpoints)"]
-            Env["Environment Variables<br/>(Credentials)"]
+        subgraph "🔧 Plugin Modules"
+            SOPS["⚙️ SOPS Module<br/>Standard Operations"]
+            Events["🎯 Events Module<br/>Kubernetes Events"]
+            Metrics["📊 Metrics Module<br/>Prometheus Queries"]
+            Logs["📋 Logs Module<br/>Elasticsearch Search"]
+            Traces["🔍 Traces Module<br/>Jaeger Integration"]
+        end
+
+        subgraph "⚙️ Configuration"
+            Config["config.yaml<br/>Module Settings"]
+            Env["Environment Variables<br/>Credentials & Secrets"]
         end
     end
 
-    subgraph "External Services"
-        K8sAPI["Kubernetes API<br/>(Events Service)"]
-        Prometheus["Prometheus<br/>(Metrics API)"]
-        ES["Elasticsearch<br/>(Search & Analytics)"]
+    subgraph "☁️ Observability Stack"
+        subgraph "Kubernetes Cluster"
+            K8sAPI["Kubernetes API Server"]
+            Pods["Pods & Deployments"]
+            Nodes["Cluster Nodes"]
+        end
+        
+        Prometheus["📊 Prometheus<br/>Metrics & Alerting"]
+        ES["📋 Elasticsearch<br/>Log Aggregation"]
+        Jaeger["🔍 Jaeger<br/>Distributed Tracing"]
+        OpsAPI["⚙️ Ops API<br/>SOPS Execution"]
     end
 
-    Client -.->|MCP Protocol| Server
-    Server --> Core
-    Core --> Events
-    Core --> Metrics
-    Core --> Logs
-    Core --> SOPS
+    %% Client connections
+    Claude --> MCP
+    VSCode --> MCP
+    Cursor --> MCP
+    Other --> MCP
 
-    Events -->|HTTPS| K8sAPI
-    Metrics -->|HTTPS| Prometheus
-    Logs -->|HTTPS| ES
+    %% MCP to server
+    MCP --> HTTP
+    MCP --> STDIO
 
+    %% Server internal flow
+    HTTP --> Router
+    STDIO --> Router
+    Router --> Auth
+    Auth --> Cache
+    Cache --> Logger
+
+    %% Module routing
+    Router --> SOPS
+    Router --> Events
+    Router --> Metrics
+    Router --> Logs
+    Router --> Traces
+
+    %% External connections
+    Events -->|HTTPS/TLS| K8sAPI
+    Metrics -->|HTTPS/TLS| Prometheus
+    Logs -->|HTTPS/TLS| ES
+    Traces -->|HTTPS/TLS| Jaeger
+    SOPS -->|HTTPS/TLS| OpsAPI
+
+    %% Configuration
+    Config --> SOPS
     Config --> Events
     Config --> Metrics
     Config --> Logs
+    Config --> Traces
+    Env --> SOPS
     Env --> Events
     Env --> Metrics
     Env --> Logs
+    Env --> Traces
 
-    Events -.->|"get-pod-events<br/>get-deployment-events<br/>get-node-events"| Core
-    Metrics -.->|"list-metrics<br/>query-metrics<br/>query-metrics-range"| Core
-    Logs -.->|"search-logs<br/>get-pod-logs<br/>list-log-indices"| Core
+    %% Data flow
+    K8sAPI --> Pods
+    K8sAPI --> Nodes
+
+    classDef client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef server fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef module fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class Claude,VSCode,Cursor,Other client
+    class HTTP,STDIO,Router,Auth,Cache,Logger server
+    class SOPS,Events,Metrics,Logs,Traces module
+    class K8sAPI,Prometheus,ES,Jaeger,OpsAPI external
 ```
 
-## Features
+## ✨ Key Features
 
-### Core Modules
+### 🏗️ Enterprise-Ready Architecture
 
-- **🎯 Events Module**: Monitor Kubernetes events (pods, deployments, nodes)
-- **📊 Metrics Module**: Query Prometheus metrics and monitoring data
-- **📋 Logs Module**: Search and analyze logs through Elasticsearch
-- **⚙️ SOPS Module**: Execute standard operation procedures for infrastructure management
+- **🔒 Security-First Design**: Role-based access control, secure credential management, and audit logging
+- **⚡ High Performance**: Built with Go 1.24.2, optimized for low latency and high throughput
+- **🔄 Multi-Protocol Support**: HTTP/SSE and stdio modes for flexible deployment scenarios
+- **📈 Scalable & Reliable**: Production-tested with comprehensive error handling and retry mechanisms
+- **🎛️ Highly Configurable**: YAML-based configuration with environment variable support
 
-### Supported Tools
+### 🧩 Modular Plugin System
 
-The server provides the following configurable MCP tools:
+- **⚙️ SOPS Module**: Execute standardized operational procedures with safety checks and rollback capabilities
+- **🎯 Events Module**: Real-time Kubernetes event monitoring with intelligent filtering and correlation
+- **📊 Metrics Module**: Advanced Prometheus querying with natural language processing capabilities
+- **📋 Logs Module**: Powerful Elasticsearch integration with full-text search and log aggregation
+- **🔍 Traces Module**: Distributed tracing analysis with Jaeger integration for performance optimization
 
-#### Events Tools
+### 🤖 AI-Native Design
 
-- `get-pod-events` - Get Kubernetes events from all pods in specified namespace/cluster
-- `get-deployment-events` - Get Kubernetes events from all deployments in specified namespace/cluster
-- `get-node-events` - Get Kubernetes events from all nodes in specified cluster
+- **🧠 Intelligent Context**: Provides rich metadata and context to AI assistants for better decision-making
+- **💬 Natural Language Interface**: Converts complex queries into simple, conversational interactions
+- **🔄 Real-time Updates**: Live data streaming for immediate operational insights
+- **📊 Smart Aggregation**: Intelligent data summarization and trend analysis
 
-#### Metrics Tools
+## 🛠️ Available Tools
 
-- `list-metrics` - List all available metrics from Prometheus
-- `query-metrics` - Execute instant PromQL queries
-- `query-metrics-range` - Execute PromQL range queries over time periods
+The server exposes a comprehensive suite of MCP tools, each designed for specific operational tasks:
 
-#### Logs Tools
+### ⚙️ Standard Operations (SOPS)
 
-- `search-logs` - Full-text search across log messages
-- `list-log-indices` - List all indices in the Elasticsearch cluster
-- `get-pod-logs` - Query logs for specific Kubernetes pods
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `execute-sops` | Execute standardized operational procedures with safety checks | Infrastructure management, automated deployments, maintenance tasks |
 
-#### SOPS Tools
+### 🎯 Kubernetes Events
 
-- `execute-sops` - Execute standard operation procedures (SOPS) for infrastructure management
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `get-pod-events` | Retrieve real-time events from pods across namespaces/clusters | Pod troubleshooting, deployment monitoring, resource issues |
+| `get-deployment-events` | Monitor deployment lifecycle events and status changes | Release tracking, rollback decisions, scaling operations |
+| `get-node-events` | Track node-level events and cluster health indicators | Node maintenance, capacity planning, hardware issues |
+
+### 📊 Prometheus Metrics
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `list-metrics` | Discover available metrics and their metadata | Metric exploration, dashboard creation, alerting setup |
+| `query-metrics` | Execute instant PromQL queries for real-time data | Performance monitoring, SLA tracking, capacity analysis |
+| `query-metrics-range` | Run time-series queries for historical analysis | Trend analysis, capacity planning, performance optimization |
+
+### 📋 Elasticsearch Logs
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `search-logs` | Full-text search across all log messages | Error investigation, security analysis, compliance auditing |
+| `list-log-indices` | Discover available log indices and their structure | Log management, retention policies, index optimization |
+| `get-pod-logs` | Retrieve logs from specific Kubernetes pods | Application debugging, performance analysis, error tracking |
+
+### 🔍 Distributed Tracing
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `get-services` | List all available services in the tracing system | Service discovery, architecture analysis, dependency mapping |
+| `get-operations` | Retrieve available operations with span kinds | API analysis, performance profiling, service optimization |
+| `get-trace` | Fetch complete trace details by trace ID | Root cause analysis, performance bottleneck identification |
+| `find-traces` | Search traces based on various criteria | Error investigation, performance analysis, user journey tracking |
 
 ### Tool Naming Convention
 
@@ -118,23 +220,34 @@ server:
   port: 80 # Server port
   mode: sse # Server mode: stdio or sse
 
+# SOPS module configuration
+sops:
+  enabled: true # Whether to enable SOPS module
+  tools:
+    prefix: "" # Tool name prefix
+    suffix: "-from-ops" # Tool name suffix
+  ops:
+    endpoint: "https://ops-server.your-company.com" # SOPS API endpoint
+    token: "${SOPS_TOKEN}" # API token (supports environment variables)
+
 # Events module configuration
 events:
   enabled: true # Whether to enable events module
-  endpoint: "https://ops-server.your-company.com/api/v1/events" # Events API endpoint
-  token: "${EVENTS_TOKEN}" # API token (supports environment variables)
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-nats" # Tool name suffix
+    suffix: "-from-ops" # Tool name suffix
+  ops:
+    endpoint: "https://ops-server.your-company.com" # Events API endpoint
+    token: "${EVENTS_OPS_TOKEN}" # API token (supports environment variables)
 
 # Metrics module configuration
 metrics:
   enabled: true # Whether to enable metrics module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-prometheus" # Tool name suffix
+    suffix: "-from-prometheus" # Tool name suffix
   prometheus:
-    endpoint: "https://prometheus.your-company.com/api/v1" # Prometheus API endpoint
+    endpoint: "https://prometheus.your-company.com" # Prometheus endpoint
     timeout: 30 # Request timeout (seconds)
 
 # Logs module configuration
@@ -142,37 +255,55 @@ logs:
   enabled: true # Whether to enable logs module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-elasticsearch" # Tool name suffix
+    suffix: "-from-elasticsearch" # Tool name suffix
   elasticsearch:
-    endpoint: "https://elasticsearch.your-company.com:9200" # Elasticsearch endpoint
-    username: "${LOGS_LOGS_ELASTICSEARCH_USERNAMENAME}" # Username (supports environment variables)
-    password: "${LOGS_LOGS_ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
+    endpoint: "https://elasticsearch.your-company.com" # Elasticsearch endpoint
+    username: "${LOGS_ELASTICSEARCH_USERNAME}" # Username (supports environment variables)
+    password: "${LOGS_ELASTICSEARCH_PASSWORD}" # Password (supports environment variables)
     timeout: 30 # Request timeout (seconds)
 
-# SOPS module configuration
-sops:
-  enabled: true # Whether to enable SOPS module
-  endpoint: "https://ops-server.your-company.com" # SOPS API endpoint
-  token: "${SOPS_TOKEN}" # API token (supports environment variables)
+# Traces module configuration
+traces:
+  enabled: true # Whether to enable traces module
   tools:
     prefix: "" # Tool name prefix
-    suffix: "-provided-by-sops" # Tool name suffix
+    suffix: "-from-jaeger" # Tool name suffix
+  jaeger:
+    endpoint: "https://jaeger.your-company.com" # Jaeger API endpoint
+    timeout: 30 # Request timeout (seconds)
 ```
 
 ### Environment Variables
 
 Set the following environment variables in production:
 
+**Note**: 
+- Command line flags take precedence over environment variables. If both are specified, the command line flag value will be used.
+- By default, all modules are **disabled**. You need to explicitly enable modules using either command line flags or environment variables.
+
 ```bash
-# Events API configuration
-export EVENTS_TOKEN="your-events-api-token"
+# Module enablement (default: all disabled)
+export SOPS_ENABLED="true"
+export EVENTS_ENABLED="true"
+export METRICS_ENABLED="true"
+export LOGS_ENABLED="true"
+export TRACES_ENABLED="true"
 
 # SOPS API configuration
-export SOPS_TOKEN="your-sops-api-token"
+export SOPS_OPS_ENDPOINT="https://ops-server.your-company.com"
+export SOPS_OPS_TOKEN="your-sops-api-token"
+
+# Events API configuration
+export EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com"
+export EVENTS_OPS_TOKEN="your-events-api-token"
+
+# Traces configuration
+export TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com"
+export TRACES_JAEGER_TIMEOUT="30"
 
 # Elasticsearch configuration
-export LOGS_LOGS_ELASTICSEARCH_USERNAMENAME="elastic"
-export LOGS_LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
+export LOGS_ELASTICSEARCH_USERNAME="elastic"
+export LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
 
 
 # Optional: Prometheus authentication
@@ -188,27 +319,34 @@ export LOG_LEVEL="info"
 
 With the above configuration, the actual tool names will be:
 
+#### SOPS Tools
+
+- `execute-sops-from-ops`
+
 #### Events Tools
 
-- `get-pod-events-provided-by-nats`
-- `get-deployment-events-provided-by-nats`
-- `get-node-events-provided-by-nats`
+- `get-pod-events-from-ops`
+- `get-deployment-events-from-ops`
+- `get-node-events-from-ops`
 
 #### Metrics Tools
 
-- `list-metrics-provided-by-prometheus`
-- `query-metrics-provided-by-prometheus`
-- `query-metrics-range-provided-by-prometheus`
+- `list-metrics-from-prometheus`
+- `query-metrics-from-prometheus`
+- `query-metrics-range-from-prometheus`
 
 #### Logs Tools
 
-- `search-logs-provided-by-elasticsearch`
-- `list-log-indices-provided-by-elasticsearch`
-- `get-pod-logs-provided-by-elasticsearch`
+- `search-logs-from-elasticsearch`
+- `list-log-indices-from-elasticsearch`
+- `get-pod-logs-from-elasticsearch`
 
-#### SOPS Tools
+#### Traces Tools
 
-- `execute-sops-provided-by-sops`
+- `get-services-from-jaeger`
+- `get-operations-from-jaeger`
+- `get-trace-from-jaeger`
+- `find-traces-from-jaeger`
 
 To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
 
@@ -219,33 +357,38 @@ To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to 
 You can call tools with parameters (using the actual configured tool names):
 
 ```javascript
-// Execute metrics query
-const result = await mcpClient.callTool(
-  "query-metrics-provided-by-prometheus",
-  {
-    query: "count by (cluster) (up)",
-  }
-);
+// Execute SOPS procedure
+const sopsResult = await mcpClient.callTool("execute-sops-from-ops", {
+  sops_id: "deploy-application",
+  parameters: '{"app_name": "my-app", "version": "v1.2.3"}',
+  timeout: "30m",
+  dry_run: "false",
+});
 
 // Get Pod events
-const events = await mcpClient.callTool("get-pod-events-provided-by-nats", {
+const events = await mcpClient.callTool("get-pod-events-from-ops", {
   cluster: "production",
   namespace: "ai-nlp-fcheck",
   limit: "20",
 });
 
+// Execute metrics query
+const result = await mcpClient.callTool("query-metrics-from-prometheus", {
+  query: "count by (cluster) (up)",
+});
+
 // Search logs
-const logs = await mcpClient.callTool("search-logs-provided-by-elasticsearch", {
+const logs = await mcpClient.callTool("search-logs-from-elasticsearch", {
   search_term: "error",
   limit: "50",
   time_range: "1h",
 });
 
-// Execute SOPS procedure
-const sopsResult = await mcpClient.callTool("execute-sops-provided-by-sops", {
-  sops_id: "deploy-application",
-  parameters: '{"app_name": "my-app", "version": "v1.2.3"}',
-  timeout: "30m",
+// Query traces
+const traces = await mcpClient.callTool("find-traces-from-jaeger", {
+  service: "my-service",
+  operation: "my-operation",
+  limit: "10",
 });
 ```
 
@@ -263,15 +406,37 @@ Using this MCP server in Claude Desktop:
         "--rm",
         "-i",
         "--env",
-        "EVENTS_TOKEN=your-token",
+        "SOPS_ENABLED=true",
         "--env",
-        "LOGS_LOGS_ELASTICSEARCH_USERNAMENAME=elastic",
+        "SOPS_OPS_ENDPOINT=https://ops-server.your-company.com",
         "--env",
-        "LOGS_LOGS_ELASTICSEARCH_PASSWORD=your-password",
+        "SOPS_OPS_TOKEN=your-sops-token",
+        "--env",
+        "EVENTS_ENABLED=true",
+        "--env",
+        "EVENTS_OPS_ENDPOINT=https://ops-server.your-company.com",
+        "--env",
+        "EVENTS_OPS_TOKEN=your-events-token",
+        "--env",
+        "METRICS_ENABLED=true",
+        "--env",
+        "LOGS_ENABLED=true",
+        "--env",
+        "LOGS_ELASTICSEARCH_USERNAME=elastic",
+        "--env",
+        "LOGS_ELASTICSEARCH_PASSWORD=your-password",
+        "--env",
+        "TRACES_ENABLED=true",
+        "--env",
+        "TRACES_JAEGER_ENDPOINT=https://jaeger.your-company.com",
+        "--env",
+        "TRACES_JAEGER_TIMEOUT=30",
         "shaowenchen/ops-mcp-server:latest",
+        "--enable-sops",
         "--enable-events",
         "--enable-metrics",
-        "--enable-logs"
+        "--enable-logs",
+        "--enable-traces"
       ]
     }
   }
@@ -289,12 +454,21 @@ Using this MCP server in Claude Desktop:
 docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
-  -e EVENTS_TOKEN="your-events-api-token" \
-  -e SOPS_TOKEN="your-sops-api-token" \
+  -e SOPS_ENABLED="true" \
+  -e SOPS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e SOPS_OPS_TOKEN="your-sops-api-token" \
+  -e EVENTS_ENABLED="true" \
+  -e EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e EVENTS_OPS_TOKEN="your-events-api-token" \
+  -e METRICS_ENABLED="true" \
+  -e LOGS_ENABLED="true" \
   -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
   -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e TRACES_ENABLED="true" \
+  -e TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com" \
+  -e TRACES_JAEGER_TIMEOUT="30" \
   shaowenchen/ops-mcp-server:latest \
-  --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
+  --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 #### Docker with Custom Configuration
@@ -305,10 +479,19 @@ docker run -d \
   --name ops-mcp-server \
   -p 80:80 \
   -v $(pwd)/configs/config.yaml:/runtime/configs/config.yaml \
-  -e EVENTS_TOKEN="your-events-api-token" \
-  -e SOPS_TOKEN="your-sops-api-token" \
+  -e SOPS_ENABLED="true" \
+  -e SOPS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e SOPS_OPS_TOKEN="your-sops-api-token" \
+  -e EVENTS_ENABLED="true" \
+  -e EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com" \
+  -e EVENTS_OPS_TOKEN="your-events-api-token" \
+  -e METRICS_ENABLED="true" \
+  -e LOGS_ENABLED="true" \
   -e LOGS_ELASTICSEARCH_USERNAME="elastic" \
   -e LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password" \
+  -e TRACES_ENABLED="true" \
+  -e TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com" \
+  -e TRACES_JAEGER_TIMEOUT="30" \
   shaowenchen/ops-mcp-server:latest \
   --config=./configs/config.yaml --mode=sse
 ```
@@ -325,17 +508,27 @@ services:
     environment:
       - OPS_MCP_ENV=production
       - OPS_MCP_LOG_LEVEL=info
-      - EVENTS_TOKEN=${EVENTS_TOKEN}
-      - SOPS_TOKEN=${SOPS_TOKEN}
+      - SOPS_ENABLED=${SOPS_ENABLED}
+      - SOPS_OPS_ENDPOINT=${SOPS_OPS_ENDPOINT}
+      - SOPS_OPS_TOKEN=${SOPS_OPS_TOKEN}
+      - EVENTS_ENABLED=${EVENTS_ENABLED}
+      - EVENTS_OPS_ENDPOINT=${EVENTS_OPS_ENDPOINT}
+      - EVENTS_OPS_TOKEN=${EVENTS_OPS_TOKEN}
+      - METRICS_ENABLED=${METRICS_ENABLED}
+      - LOGS_ENABLED=${LOGS_ENABLED}
       - LOGS_ELASTICSEARCH_USERNAME=${LOGS_ELASTICSEARCH_USERNAME}
       - LOGS_ELASTICSEARCH_PASSWORD=${LOGS_ELASTICSEARCH_PASSWORD}
+      - TRACES_ENABLED=${TRACES_ENABLED}
+      - TRACES_JAEGER_ENDPOINT=${TRACES_JAEGER_ENDPOINT}
+      - TRACES_JAEGER_TIMEOUT=${TRACES_JAEGER_TIMEOUT}
     command:
       [
         "--mode=sse",
+        "--enable-sops",
         "--enable-events",
         "--enable-metrics",
         "--enable-logs",
-        "--enable-sops",
+        "--enable-traces",
       ]
     healthcheck:
       test:
@@ -371,10 +564,10 @@ make dev-setup
 make build
 
 # Run server (stdio mode, for MCP clients)
-./bin/ops-mcp-server --enable-events --enable-metrics --enable-logs --enable-sops
+./bin/ops-mcp-server --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 
 # Run server (SSE mode, for HTTP API)
-./bin/ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops
+./bin/ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 #### Using Makefile
@@ -384,9 +577,11 @@ make build
 make quick  # Format, check, test, build
 
 # Run specific modules
+make run-sops      # Run SOPS module only
 make run-events    # Run events module only
 make run-metrics   # Run metrics module only
 make run-logs      # Run logs module only
+make run-traces  # Run traces module only
 make run-all       # Run all modules
 
 # Test MCP functionality
@@ -440,11 +635,13 @@ Health check response example:
   "timestamp": "2024-01-20T10:30:00Z",
   "mode": "sse",
   "modules": {
+    "sops": true,
     "events": true,
     "metrics": true,
-    "logs": true
+    "logs": true,
+    "traces": true
   },
-  "tools_count": 9
+  "tools_count": 14
 }
 ```
 
@@ -453,7 +650,7 @@ Health check response example:
 STDIO mode is suitable for direct MCP client integration (such as Claude Desktop):
 
 ```bash
-./ops-mcp-server --enable-events --enable-metrics --enable-logs
+./ops-mcp-server --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
 ```
 
 ### Command Line Options
@@ -467,13 +664,14 @@ STDIO mode is suitable for direct MCP client integration (such as Claude Desktop
 --log-level       # Log level (debug|info|warn|error, default: info)
 
 # Module switches
+--enable-sops     # Enable SOPS module
 --enable-events   # Enable events module
 --enable-metrics  # Enable metrics module
 --enable-logs     # Enable logs module
---enable-sops     # Enable SOPS module
+--enable-traces # Enable traces module
 
 # Usage example
-./ops-mcp-server --mode=sse --enable-events --enable-metrics --enable-logs --enable-sops --port=8080 --log-level=debug
+./ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces --port=8080 --log-level=debug
 ```
 
 ## Development Guide
@@ -486,9 +684,11 @@ ops-mcp-server/
 ├── pkg/
 │   ├── config/          # Configuration structure definitions
 │   ├── modules/         # Business modules
+│   │   ├── sops/        # SOPS module
 │   │   ├── events/      # Events module
 │   │   ├── metrics/     # Metrics module
-│   │   └── logs/        # Logs module
+│   │   ├── logs/        # Logs module
+│   │   └── traces/      # Traces module
 │   └── server/          # Server configuration
 ├── configs/             # Configuration files
 ├── deploy/              # Deployment configuration
@@ -564,6 +764,28 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - 📖 [Documentation](https://github.com/shaowenchen/ops-mcp-server/wiki)
 - 📧 Email: mail@chenshaowen.com
 
+## 🎯 Why Choose Ops MCP Server?
+
+### 🚀 **Immediate Value**
+- **⚡ 10x Faster Troubleshooting**: Get instant answers to complex operational questions
+- **🧠 AI-Powered Insights**: Leverage AI's pattern recognition for proactive issue detection
+- **🔄 24/7 Operations**: Never miss critical alerts with intelligent monitoring
+- **📊 Unified View**: Single interface for all your observability data
+
+### 🏢 **Enterprise Benefits**
+- **🔒 Enterprise Security**: Role-based access, audit trails, and secure credential management
+- **📈 Scalable Architecture**: Handles high-volume production workloads with ease
+- **🛠️ Easy Integration**: Drop-in replacement for existing monitoring workflows
+- **💰 Cost Effective**: Reduce operational overhead and improve team productivity
+
+### 🤖 **AI-First Design**
+- **💬 Natural Language**: Ask questions in plain English, get structured data back
+- **🧩 Modular**: Enable only the modules you need, customize as you grow
+- **🔄 Real-time**: Live data streaming for immediate operational insights
+- **📊 Smart**: Intelligent data aggregation and trend analysis
+
 ---
 
-**✨ Let AI assistants directly access your operations data to improve operational efficiency!**
+**🚀 Transform your AI assistant into an intelligent operations engineer today!**
+
+*Ready to revolutionize your operations workflow? [Get started now →](#quick-start)*
