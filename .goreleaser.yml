@@ -1,11 +1,8 @@
-version: 2
-
 project_name: ops-mcp-server
-
 builds:
   - env:
       - CGO_ENABLED=0
-    main: ./cmd/server
+    main: ./cmd/server/main.go
     binary: ops-mcp-server
     goos:
       - linux
@@ -21,86 +18,18 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    tags: netgo
+    tags: containers_image_openpgp
     ldflags:
-      - -X "main.version={{ .Version }}"
-      - -X "main.commit={{ .ShortCommit }}"
-      - -X "main.date={{ .Date }}"
+      - -X "github.com/shaowenchen/ops-mcp-server/cmd/version.BuildVersion={{ .Version }}"
+      - -X "github.com/shaowenchen/ops-mcp-server/cmd/version.BuildDate={{ .Date }}"
+      - -X "github.com/shaowenchen/ops-mcp-server/cmd/version.GitCommitID={{ .ShortCommit }}"
       - -w
       - -s
-
 dist: bin
-
 archives:
   - name_template: "ops-mcp-server-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
-    format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
-      - README.md
-      - configs/*.yaml
-      - deploy/*.yaml
-
-checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
-  algorithm: sha256
-
-changelog:
-  disable: true
-
-release:
-  github:
-    owner: shaowenchen
-    name: ops-mcp-server
-  draft: false
-  prerelease: "false"
-  mode: "replace"
-  header: |
-    ## 🚀 Ops MCP Server {{ .Version }}
-
-    A comprehensive Model Context Protocol (MCP) server for operations management.
-
-    ### 📦 Downloads
-
-    Download the appropriate binary for your platform:
-  footer: |
-    ### 📋 Installation
-
-    #### Using Go
-    ```bash
-    go install github.com/shaowenchen/ops-mcp-server@{{ .Version }}
-    ```
-
-    #### Using Binary
-    1. Download the binary for your platform from the assets above
-    2. Make it executable: `chmod +x ops-mcp-server`
-    3. Move to your PATH: `sudo mv ops-mcp-server /usr/local/bin/`
-
-    ### 🚀 Quick Start
-
-    ```bash
-    # Run with all modules
-    ops-mcp-server --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces
-
-    # Run with specific modules
-    ops-mcp-server --enable-events --enable-metrics
-    ```
-
-    ### 📖 Documentation
-
-    See [README.md](https://github.com/shaowenchen/ops-mcp-server/blob/master/README.md) for detailed usage instructions.
-
-dockers:
-  - image_templates:
-      - "shaowenchen/ops-mcp-server:{{ .Version }}"
-      - "shaowenchen/ops-mcp-server:latest"
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - --platform=linux/amd64
-      - --platform=linux/arm64
-    extra_files:
-      - README.md
       - configs/
       - deploy/
+changelog:
+  disable: true

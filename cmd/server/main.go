@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/shaowenchen/ops-mcp-server/cmd/version"
 	"github.com/shaowenchen/ops-mcp-server/pkg/config"
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
 	logsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/logs"
@@ -28,14 +29,27 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ops-mcp-server",
-	Short: "Ops MCP Server - A modular operational monitoring server",
-	Long:  `A modular MCP server providing operational monitoring capabilities including events, metrics, and logs.`,
-	Run:   runServer,
+	Use:     "ops-mcp-server",
+	Short:   "Ops MCP Server - A modular operational monitoring server",
+	Long:    `A modular MCP server providing operational monitoring capabilities including events, metrics, and logs.`,
+	Run:     runServer,
+	Version: version.Short(),
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Long:  `Print detailed version information including build date, git commit, and platform.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.String())
+	},
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	// Add version command
+	rootCmd.AddCommand(versionCmd)
 
 	// Configuration flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is configs/config.yaml)")
@@ -236,7 +250,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	)
 
 	// Create MCP server
-	mcpServer := server.NewMCPServer("ops-mcp-server", "1.0.0")
+	mcpServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
 
 	// Register modules based on configuration
 	var toolCount int
@@ -466,12 +480,15 @@ func runServer(cmd *cobra.Command, args []string) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 
+			versionInfo := version.Get()
 			healthResponse := map[string]interface{}{
-				"status":    "ok",
-				"service":   "ops-mcp-server",
-				"version":   "1.0.0",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
-				"mode":      serverMode,
+				"status":     "ok",
+				"service":    "ops-mcp-server",
+				"version":    versionInfo.Version,
+				"build_date": versionInfo.BuildDate,
+				"git_commit": versionInfo.GitCommit,
+				"timestamp":  time.Now().UTC().Format(time.RFC3339),
+				"mode":       serverMode,
 				"modules": map[string]bool{
 					"sops":    cfg.Sops.Enabled,
 					"events":  cfg.Events.Enabled,
