@@ -1,3 +1,5 @@
+version: 2
+
 project_name: ops-mcp-server
 
 builds:
@@ -37,7 +39,6 @@ archives:
         format: zip
     files:
       - README.md
-      - LICENSE
       - configs/*.yaml
       - deploy/*.yaml
 
@@ -46,15 +47,15 @@ checksum:
   algorithm: sha256
 
 changelog:
-  skip: true
+  disable: true
 
 release:
   github:
     owner: shaowenchen
     name: ops-mcp-server
   draft: false
-  prerelease: false
-  mode: replace
+  prerelease: "false"
+  mode: "replace"
   header: |
     ## 🚀 Ops MCP Server {{ .Version }}
 
