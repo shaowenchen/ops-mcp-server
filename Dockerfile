@@ -5,6 +5,8 @@ FROM shaowenchen/builder-golang:1.24 AS builder
 WORKDIR /builder
 
 COPY . .
+
+RUN go mod tidy && go mod vendor
 # Build the application
 RUN GO111MODULE=on CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
 
