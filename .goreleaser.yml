@@ -32,4 +32,4 @@ archives:
       - configs/
       - deploy/
 changelog:
-  disable: true
+  skip: true
