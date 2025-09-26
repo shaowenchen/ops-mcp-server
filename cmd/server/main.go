@@ -463,7 +463,9 @@ func runServer(cmd *cobra.Command, args []string) {
 	switch serverMode {
 	case "stdio":
 		logger.Info("Starting server in stdio mode")
-		if err := server.ServeStdio(mcpServer); err != nil {
+		if err := server.ServeStdio(
+				mcpServer,
+			); err != nil {
 			logger.Fatal("Stdio server failed", zap.Error(err))
 		}
 	case "sse":
@@ -513,6 +515,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			mcpServer,
 			server.WithStreamableHTTPServer(httpServer),
 			server.WithEndpointPath("/mcp"),
+			server.WithHeartbeatInterval(3*time.Second),
 		)
 
 		// Mount MCP handler to the mux
