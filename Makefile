@@ -26,7 +26,7 @@ all: clean test build
 build:
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) ./$(MAIN_PATH)
+	$(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) ./$(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
 # Build for multiple platforms
 .PHONY: build-all
@@ -34,28 +34,28 @@ build-all: clean
 	@echo "Building for multiple platforms..."
 	@mkdir -p $(BUILD_DIR)
 	# Linux AMD64
-	GOOS=linux GOARCH=amd64 $(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./$(MAIN_PATH)
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./$(MAIN_PATH)
 	# Linux ARM64
-	GOOS=linux GOARCH=arm64 $(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./$(MAIN_PATH)
+	GOOS=linux GOARCH=arm64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./$(MAIN_PATH)
 	# macOS AMD64
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./$(MAIN_PATH)
+	GOOS=darwin GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./$(MAIN_PATH)
 	# macOS ARM64
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./$(MAIN_PATH)
+	GOOS=darwin GOARCH=arm64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./$(MAIN_PATH)
 	# Windows AMD64
-	GOOS=windows GOARCH=amd64 $(GOBUILD) -mod=vendor -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./$(MAIN_PATH)
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./$(MAIN_PATH)
 	@echo "Multi-platform build complete"
 
 # Test the application
 .PHONY: test
 test:
 	@echo "Running tests..."
-	$(GOTEST) -mod=vendor -v ./...
+	$(GOTEST) -v ./...
 
 # Test with coverage
 .PHONY: test-coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	$(GOTEST) -mod=vendor -v -coverprofile=coverage.out ./...
+	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
