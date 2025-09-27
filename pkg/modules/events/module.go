@@ -84,15 +84,26 @@ func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string,
 	}
 
 	// Log request details
+	authMethod := "none"
+	if m.config.Token != "" {
+		authMethod = "bearer_token"
+	}
+
 	m.logger.Info("🎪 Making Events API Request",
 		zap.String("method", method),
 		zap.String("full_url", url),
 		zap.String("endpoint", m.config.Endpoint),
 		zap.Bool("has_body", body != nil),
-		zap.Bool("has_token", m.config.Token != ""))
+		zap.Bool("has_token", m.config.Token != ""),
+		zap.String("auth_method", authMethod))
 
 	// Also print to console for visibility
 	fmt.Printf("🔍 Events API Call: %s %s\n", method, url)
+	if m.config.Token != "" {
+		fmt.Printf("🔐 Authorization: Bearer [TOKEN_PRESENT]\n")
+	} else {
+		fmt.Printf("⚠️  No Authorization token configured\n")
+	}
 	if bodyStr != "" {
 		// Pretty print JSON body if it's not too long
 		if len(bodyStr) < 500 {
@@ -121,10 +132,8 @@ func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string,
 	req.Header.Set("Accept", "application/json")
 
 	// Add Authorization header if token is configured
-	authMethod := "none"
 	if m.config.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+m.config.Token)
-		authMethod = "bearer_token"
 	}
 
 	resp, err := m.httpClient.Do(req)
@@ -335,34 +344,115 @@ func (m *Module) GetTools() []server.ServerTool {
 }
 
 // Tool handlers
-func (m *Module) handleGetPodEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return m.handleEvents(ctx, request, "pods")
-}
-
-func (m *Module) handleGetDeploymentEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return m.handleEvents(ctx, request, "deployments")
-}
-
-func (m *Module) handleGetNodesEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return m.handleEvents(ctx, request, "nodes")
-}
-
-func (m *Module) handleGetRawEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (m *Module) handleListEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
 
 	// Log incoming request
-	fmt.Printf("📥 Received raw events request with args: %+v\n", args)
-	m.logger.Info("Processing raw events request",
+	fmt.Printf("📥 Received list events request with args: %+v\n", args)
+	m.logger.Info("Processing list events request",
 		zap.Any("arguments", args))
 
-	// Parse parameters for raw events query
+	// Parse parameters
+	var search string
+	var pageSize, page int = 10, 1
+
+	if val, ok := args["search"].(string); ok {
+		search = val
+	}
+	if val, ok := args["page_size"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			pageSize = parsed
+		}
+	}
+	if val, ok := args["page"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+
+	// Build query parameters for the list events API
+	queryParams := make(map[string]string)
+	queryParams["page_size"] = strconv.Itoa(pageSize)
+	queryParams["page"] = strconv.Itoa(page)
+	if search != "" {
+		queryParams["search"] = search
+	}
+
+	// Build full URL with query parameters
+	// Format: {endpoint}/api/v1/events?query_params
+	url := m.config.Endpoint + "/api/v1/events"
+	if len(queryParams) > 0 {
+		url += "?"
+		first := true
+		for key, value := range queryParams {
+			if !first {
+				url += "&"
+			}
+			url += key + "=" + value
+			first = false
+		}
+	}
+
+	m.logger.Info("🌐 Making List Events API Request",
+		zap.String("full_url", url),
+		zap.String("base_endpoint", m.config.Endpoint),
+		zap.Any("query_params", queryParams),
+		zap.String("search", search),
+		zap.Int("page_size", pageSize),
+		zap.Int("page", page))
+
+	// Also print to console for visibility
+	fmt.Printf("🎯 List Events API Query URL: %s\n", url)
+
+	resp, err := m.makeRequestWithFullURL(ctx, "GET", url, nil)
+	if err != nil {
+		m.logger.Error("Failed to fetch event types from API", zap.Error(err))
+		return nil, fmt.Errorf("failed to call list events API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		m.logger.Error("List events API returned non-OK status",
+			zap.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("list events API returned status %d", resp.StatusCode)
+	}
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Log response summary
+	fmt.Printf("✅ Successfully fetched event types from API (response size: %d bytes)\n", len(body))
+
+	// Return the raw response from the API
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(body),
+			},
+		},
+	}, nil
+}
+
+func (m *Module) handleGetEvents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+
+	// Log incoming request
+	fmt.Printf("📥 Received get events request with args: %+v\n", args)
+	m.logger.Info("Processing get events request",
+		zap.Any("arguments", args))
+
+	// Parse parameters for events query
 	var subjectPattern, startTime string
 	var limit, offset int = 10, 0
 
 	if val, ok := args["subject_pattern"].(string); ok {
 		subjectPattern = val
 	} else {
-		return nil, fmt.Errorf("subject_pattern is required for raw events query")
+		return nil, fmt.Errorf("subject_pattern is required for events query")
 	}
 
 	if val, ok := args["start_time"].(string); ok {
@@ -383,7 +473,7 @@ func (m *Module) handleGetRawEvents(ctx context.Context, request mcp.CallToolReq
 		}
 	}
 
-	// Create request for events API using raw subject pattern
+	// Create request for events API using subject pattern
 	req := EventsListRequest{
 		Limit:          limit,
 		Offset:         offset,
@@ -394,114 +484,12 @@ func (m *Module) handleGetRawEvents(ctx context.Context, request mcp.CallToolReq
 	// Fetch events
 	response, err := m.fetchEventsFromAPI(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch raw events: %w", err)
+		return nil, fmt.Errorf("failed to fetch events: %w", err)
 	}
 
 	// Log response summary
 	fmt.Printf("✅ Successfully fetched %d events using pattern '%s' (total available: %d)\n",
 		len(response.Data.List), subjectPattern, response.Data.Total)
-
-	if len(response.Data.List) > 0 {
-		sample := response.Data.List[0]
-		fmt.Printf("📋 Sample event - Subject: %s\n", sample.Subject)
-		fmt.Printf("🔍 Parsed info - Cluster: %s, Namespace: %s, Resource: %s, Name: %s\n",
-			sample.ParsedInfo.Cluster, sample.ParsedInfo.Namespace,
-			sample.ParsedInfo.Resource, sample.ParsedInfo.Name)
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-// Common handler for events (Kubernetes and other types)
-func (m *Module) handleEvents(ctx context.Context, request mcp.CallToolRequest, resourceType string) (*mcp.CallToolResult, error) {
-	args := request.GetArguments()
-
-	// Log incoming request
-	fmt.Printf("📥 Received %s events request with args: %+v\n", resourceType, args)
-	m.logger.Info("Processing events request",
-		zap.String("resource_type", resourceType),
-		zap.Any("arguments", args))
-
-	// Parse parameters for events
-	var cluster, namespace, resourceName, startTime string
-	var limit, offset int = 10, 0
-
-	if val, ok := args["cluster"].(string); ok {
-		cluster = val
-	}
-	// Only parse namespace for resources that support it (not for nodes)
-	if resourceType != "nodes" {
-		if val, ok := args["namespace"].(string); ok {
-			namespace = val
-		}
-		// Parse pod for pods
-		if resourceType == "pods" {
-			if val, ok := args["pod"].(string); ok {
-				resourceName = val
-			}
-		}
-		// Parse deployment for deployments
-		if resourceType == "deployments" {
-			if val, ok := args["deployment"].(string); ok {
-				resourceName = val
-			}
-		}
-	} else {
-		// Parse node for nodes
-		if val, ok := args["node"].(string); ok {
-			resourceName = val
-		}
-	}
-	if val, ok := args["start_time"].(string); ok {
-		startTime = val
-	} else {
-		// Default: 30 minutes ago
-		defaultTime := time.Now().Add(-30 * time.Minute)
-		startTime = strconv.FormatInt(defaultTime.UnixMilli(), 10)
-	}
-	if val, ok := args["limit"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-	if val, ok := args["offset"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
-
-	// Create request for events API
-	req := EventsListRequest{
-		Limit:        limit,
-		Offset:       offset,
-		Cluster:      cluster,
-		Namespace:    namespace, // Will be empty for nodes, which is correct
-		Resource:     resourceType,
-		ResourceName: resourceName, // Specific resource name if provided
-		StartTime:    startTime,
-	}
-
-	// Fetch events
-	response, err := m.fetchEventsFromAPI(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s events: %w", resourceType, err)
-	}
-
-	// Log response summary and show sample parsing
-	fmt.Printf("✅ Successfully fetched %d %s events (total available: %d)\n",
-		len(response.Data.List), resourceType, response.Data.Total)
 
 	if len(response.Data.List) > 0 {
 		sample := response.Data.List[0]
