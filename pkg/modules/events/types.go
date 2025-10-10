@@ -1,32 +1,22 @@
 package events
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 )
 
-// EventData represents the inner event data (can be from Kubernetes or other sources)
-type EventData struct {
-	Type      string `json:"type" yaml:"type"`
-	Reason    string `json:"reason" yaml:"reason"`
-	EventTime string `json:"eventTime" yaml:"eventTime"`
-	From      string `json:"from" yaml:"from"`
-	Message   string `json:"message" yaml:"message"`
-	// Additional fields for different event types
-	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-}
-
 // Event represents a CloudEvent format event (can be K8s or other types)
 type Event struct {
-	SpecVersion     string    `json:"specversion" yaml:"specversion"`
-	ID              string    `json:"id" yaml:"id"`
-	Source          string    `json:"source" yaml:"source"`
-	Type            string    `json:"type" yaml:"type"`
-	Subject         string    `json:"subject" yaml:"subject"`
-	DataContentType string    `json:"datacontenttype" yaml:"datacontenttype"`
-	Time            string    `json:"time" yaml:"time"`
-	Data            EventData `json:"data" yaml:"data"`
-	Cluster         string    `json:"cluster" yaml:"cluster"`
+	SpecVersion     string          `json:"specversion" yaml:"specversion"`
+	ID              string          `json:"id" yaml:"id"`
+	Source          string          `json:"source" yaml:"source"`
+	Type            string          `json:"type" yaml:"type"`
+	Subject         string          `json:"subject" yaml:"subject"`
+	DataContentType string          `json:"datacontenttype" yaml:"datacontenttype"`
+	Time            string          `json:"time" yaml:"time"`
+	Data            json.RawMessage `json:"data" yaml:"data"` // Keep as RawMessage for flexibility
+	Cluster         string          `json:"cluster" yaml:"cluster"`
 }
 
 // EventWrapper represents the complete event structure from the API
@@ -110,7 +100,7 @@ func ParseSubject(subject string) ParsedEventInfo {
 				if i+1 < len(parts) && parts[i+1] != "event" {
 					info.Name = parts[i+1]
 				}
-				break
+				return info
 			default:
 				// For other resources (pods, deployments, services, etc.)
 				if i > 0 && (parts[i-1] == "namespaces" || parts[i-1] == "clusters") {
