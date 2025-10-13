@@ -16,6 +16,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/shaowenchen/ops-mcp-server/cmd/version"
 	"github.com/shaowenchen/ops-mcp-server/pkg/config"
+	"github.com/shaowenchen/ops-mcp-server/pkg/docs"
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
 	logsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/logs"
 	metricsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/metrics"
@@ -529,11 +530,16 @@ func runServer(cmd *cobra.Command, args []string) {
 		// Mount MCP handler to the mux
 		mux.Handle("/mcp", streamableServer)
 
+		// Add docs endpoint
+		docsHandler := docs.NewHandler(&cfg, logger)
+		mux.HandleFunc("/mcp/docs", docsHandler.HandleDocs)
+
 		// Start SSE server
 		logger.Info("Starting server in SSE mode with health check",
 			zap.String("address", httpServer.Addr),
 			zap.String("health_endpoint", "/healthz"),
-			zap.String("mcp_endpoint", "/mcp"))
+			zap.String("mcp_endpoint", "/mcp"),
+			zap.String("docs_endpoint", "/mcp/docs"))
 
 		if err := streamableServer.Start(httpServer.Addr); err != nil {
 			logger.Fatal("SSE server failed to start", zap.Error(err))
