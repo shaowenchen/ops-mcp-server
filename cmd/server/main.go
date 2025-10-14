@@ -24,6 +24,28 @@ import (
 	tracesModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/traces"
 )
 
+// normalizeURI normalizes the URI path to ensure consistent handling of trailing slashes
+func normalizeURI(uri string) string {
+	if uri == "" {
+		return "/mcp"
+	}
+
+	// Ensure URI starts with /
+	if !strings.HasPrefix(uri, "/") {
+		uri = "/" + uri
+	}
+
+	// Remove trailing slash for consistency
+	uri = strings.TrimSuffix(uri, "/")
+
+	// Handle edge case where URI becomes empty after trimming
+	if uri == "" {
+		return "/mcp"
+	}
+
+	return uri
+}
+
 var (
 	cfgFile string
 	logger  *zap.Logger
@@ -58,6 +80,7 @@ func init() {
 	rootCmd.PersistentFlags().String("host", "0.0.0.0", "Server host")
 	rootCmd.PersistentFlags().Int("port", 80, "Server port")
 	rootCmd.PersistentFlags().String("mode", "stdio", "Server mode: stdio or sse")
+	rootCmd.PersistentFlags().String("uri", "/mcp", "MCP server URI path")
 
 	// Module flags with different names to avoid conflicts
 	// SOPS module
@@ -80,6 +103,7 @@ func init() {
 	viper.BindPFlag("server.host", rootCmd.PersistentFlags().Lookup("host"))
 	viper.BindPFlag("server.port", rootCmd.PersistentFlags().Lookup("port"))
 	viper.BindPFlag("server.mode", rootCmd.PersistentFlags().Lookup("mode"))
+	viper.BindPFlag("server.uri", rootCmd.PersistentFlags().Lookup("uri"))
 
 	// SOPS module bindings
 	viper.BindPFlag("cli.sops.enabled", rootCmd.PersistentFlags().Lookup("enable-sops"))
@@ -109,6 +133,7 @@ func initConfig() {
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("server.mode", "SERVER_MODE")
+	viper.BindEnv("server.uri", "SERVER_URI")
 	viper.BindEnv("sops.ops.endpoint", "SOPS_OPS_ENDPOINT")
 	viper.BindEnv("sops.ops.token", "SOPS_OPS_TOKEN")
 	viper.BindEnv("events.ops.endpoint", "EVENTS_OPS_ENDPOINT")
@@ -243,6 +268,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		zap.String("mode", serverMode),
 		zap.String("host", cfg.Server.Host),
 		zap.Int("port", cfg.Server.Port),
+		zap.String("uri", cfg.Server.URI),
 		zap.Bool("sops_enabled", cfg.Sops.Enabled),
 		zap.Bool("events_enabled", cfg.Events.Enabled),
 		zap.Bool("metrics_enabled", cfg.Metrics.Enabled),
@@ -481,8 +507,12 @@ func runServer(cmd *cobra.Command, args []string) {
 		// Create a custom HTTP mux with health check endpoint
 		mux := http.NewServeMux()
 
+		// Get MCP URI from config and normalize it
+		mcpURI := normalizeURI(cfg.Server.URI)
+
 		// Add health check endpoint
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		healthEndpoint := mcpURI + "/healthz"
+		mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet {
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
@@ -500,6 +530,11 @@ func runServer(cmd *cobra.Command, args []string) {
 				"git_commit": versionInfo.GitCommit,
 				"timestamp":  time.Now().UTC().Format(time.RFC3339),
 				"mode":       serverMode,
+				"endpoints": map[string]string{
+					"mcp":    mcpURI,
+					"docs":   mcpURI + "/docs",
+					"health": healthEndpoint,
+				},
 				"modules": map[string]bool{
 					"sops":    cfg.Sops.Enabled,
 					"events":  cfg.Events.Enabled,
@@ -523,23 +558,23 @@ func runServer(cmd *cobra.Command, args []string) {
 		streamableServer := server.NewStreamableHTTPServer(
 			mcpServer,
 			server.WithStreamableHTTPServer(httpServer),
-			server.WithEndpointPath("/mcp"),
+			server.WithEndpointPath(mcpURI),
 			server.WithHeartbeatInterval(3*time.Second),
 		)
 
 		// Mount MCP handler to the mux
-		mux.Handle("/mcp", streamableServer)
+		mux.Handle(mcpURI, streamableServer)
 
 		// Add docs endpoint
 		docsHandler := docs.NewHandler(&cfg, logger)
-		mux.HandleFunc("/mcp/docs", docsHandler.HandleDocs)
+		mux.HandleFunc(mcpURI+"/docs", docsHandler.HandleDocs)
 
 		// Start SSE server
 		logger.Info("Starting server in SSE mode with health check",
 			zap.String("address", httpServer.Addr),
-			zap.String("health_endpoint", "/healthz"),
-			zap.String("mcp_endpoint", "/mcp"),
-			zap.String("docs_endpoint", "/mcp/docs"))
+			zap.String("health_endpoint", healthEndpoint),
+			zap.String("mcp_endpoint", mcpURI),
+			zap.String("docs_endpoint", mcpURI+"/docs"))
 
 		if err := streamableServer.Start(httpServer.Addr); err != nil {
 			logger.Fatal("SSE server failed to start", zap.Error(err))

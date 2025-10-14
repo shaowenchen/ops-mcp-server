@@ -219,6 +219,7 @@ server:
   host: 0.0.0.0 # Server binding address
   port: 80 # Server port
   mode: sse # Server mode: stdio or sse
+  uri: /mcp # MCP server URI path (default: /mcp)
 
 # SOPS module configuration
 sops:
@@ -312,6 +313,7 @@ export LOGS_ELASTICSEARCH_PASSWORD="your-elasticsearch-password"
 # Server configuration
 export SERVER_HOST="0.0.0.0"
 export SERVER_PORT="80"
+export SERVER_URI="/mcp"
 export LOG_LEVEL="info"
 ```
 
@@ -613,6 +615,72 @@ make k8s-logs
 make k8s-cleanup
 ```
 
+### MCP URI Configuration
+
+The MCP server URI path is configurable and affects all endpoints:
+
+- **MCP Endpoint**: `{uri}` (e.g., `/mcp`, `/custom-mcp`)
+- **Documentation Endpoint**: `{uri}/docs` (e.g., `/mcp/docs`, `/custom-mcp/docs`)
+- **Health Check Endpoint**: `{uri}/healthz` (e.g., `/mcp/healthz`, `/custom-mcp/healthz`)
+
+#### Configuration Methods
+
+1. **Configuration File**:
+```yaml
+server:
+  uri: /custom-mcp
+```
+
+2. **Environment Variable**:
+```bash
+export SERVER_URI="/custom-mcp"
+```
+
+3. **Command Line Flag**:
+```bash
+./ops-mcp-server --uri=/custom-mcp
+```
+
+#### Priority Order
+Command line flags > Environment variables > Configuration file > Default values
+
+#### Example with Custom URI
+
+When using a custom URI like `/api/mcp`, all endpoints will be updated accordingly:
+
+```bash
+# With custom URI: /api/mcp
+export SERVER_URI="/api/mcp"
+./ops-mcp-server --mode sse
+
+# Endpoints will be:
+# - MCP: http://localhost:80/api/mcp
+# - Docs: http://localhost:80/api/mcp/docs  
+# - Health: http://localhost:80/api/mcp/healthz
+```
+
+#### URI Normalization
+
+The server automatically normalizes URI paths for consistency:
+
+- **Trailing slashes are removed**: `/mcp/` → `/mcp`
+- **Missing leading slash is added**: `mcp` → `/mcp`
+- **Empty URI defaults to**: `/mcp`
+
+Examples of equivalent configurations:
+```bash
+# All of these result in the same endpoints:
+./ops-mcp-server --uri /mcp
+./ops-mcp-server --uri /mcp/
+./ops-mcp-server --uri mcp
+./ops-mcp-server --uri ""
+
+# All produce:
+# - MCP: /mcp
+# - Docs: /mcp/docs
+# - Health: /mcp/healthz
+```
+
 ### Server Modes
 
 #### SSE Mode (Server-Sent Events)
@@ -621,8 +689,9 @@ SSE mode is suitable for web-based clients and HTTP API access:
 
 ```bash
 # Access server: http://localhost:80
-# Health check endpoint: http://localhost:80/healthz
+# Health check endpoint: http://localhost:80/mcp/healthz
 # MCP endpoint: http://localhost:80/mcp
+# Documentation endpoint: http://localhost:80/mcp/docs
 ```
 
 Health check response example:
@@ -634,6 +703,11 @@ Health check response example:
   "version": "1.0.0",
   "timestamp": "2024-01-20T10:30:00Z",
   "mode": "sse",
+  "endpoints": {
+    "mcp": "/mcp",
+    "docs": "/mcp/docs",
+    "health": "/mcp/healthz"
+  },
   "modules": {
     "sops": true,
     "events": true,
@@ -661,6 +735,7 @@ STDIO mode is suitable for direct MCP client integration (such as Claude Desktop
 --config          # Configuration file path (default: configs/config.yaml)
 --host            # Server host (default: 0.0.0.0)
 --port            # Server port (default: 80)
+--uri             # MCP server URI path (default: /mcp)
 --log-level       # Log level (debug|info|warn|error, default: info)
 
 # Module switches
@@ -671,7 +746,7 @@ STDIO mode is suitable for direct MCP client integration (such as Claude Desktop
 --enable-traces # Enable traces module
 
 # Usage example
-./ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces --port=8080 --log-level=debug
+./ops-mcp-server --mode=sse --enable-sops --enable-events --enable-metrics --enable-logs --enable-traces --port=8080 --uri=/custom-mcp --log-level=debug
 ```
 
 ## Development Guide

@@ -31,6 +31,7 @@ type ServerConfig struct {
 	Host string `mapstructure:"host" json:"host" yaml:"host"`
 	Port int    `mapstructure:"port" json:"port" yaml:"port"`
 	Mode string `mapstructure:"mode" json:"mode" yaml:"mode"`
+	URI  string `mapstructure:"uri" json:"uri" yaml:"uri"`
 }
 
 // EventsOpsConfig contains Ops backend configuration for events
