@@ -12,7 +12,7 @@ Ops MCP Server is a production-ready, Go-based MCP server that empowers AI assis
 
 - **🔍 Real-time Kubernetes Operations**: Monitor pods, deployments, nodes, and cluster events
 - **📊 Advanced Metrics Intelligence**: Query Prometheus metrics with natural language
-- **📋 Comprehensive Log Analysis**: Search and analyze logs across Elasticsearch clusters  
+- **📋 Comprehensive Log Analysis**: Search and analyze logs across Elasticsearch clusters
 - **🔧 Automated Operations**: Execute standard operating procedures (SOPS) safely
 - **🌐 Distributed Tracing**: Investigate performance issues with Jaeger integration
 
@@ -36,7 +36,7 @@ graph TB
             HTTP["HTTP/SSE Server<br/>:80"]
             STDIO["STDIO Interface"]
         end
-        
+
         subgraph "🧠 Core Engine"
             Router["Request Router"]
             Auth["Authentication<br/>& Authorization"]
@@ -64,7 +64,7 @@ graph TB
             Pods["Pods & Deployments"]
             Nodes["Cluster Nodes"]
         end
-        
+
         Prometheus["📊 Prometheus<br/>Metrics & Alerting"]
         ES["📋 Elasticsearch<br/>Log Aggregation"]
         Jaeger["🔍 Jaeger<br/>Distributed Tracing"]
@@ -160,42 +160,42 @@ The server exposes a comprehensive suite of MCP tools, each designed for specifi
 
 ### ⚙️ Standard Operations (SOPS)
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
+| Tool           | Description                                                    | Use Case                                                            |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `execute-sops` | Execute standardized operational procedures with safety checks | Infrastructure management, automated deployments, maintenance tasks |
 
 ### 🎯 Kubernetes Events
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `get-pod-events` | Retrieve real-time events from pods across namespaces/clusters | Pod troubleshooting, deployment monitoring, resource issues |
-| `get-deployment-events` | Monitor deployment lifecycle events and status changes | Release tracking, rollback decisions, scaling operations |
-| `get-node-events` | Track node-level events and cluster health indicators | Node maintenance, capacity planning, hardware issues |
+| Tool                    | Description                                                    | Use Case                                                    |
+| ----------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| `get-pod-events`        | Retrieve real-time events from pods across namespaces/clusters | Pod troubleshooting, deployment monitoring, resource issues |
+| `get-deployment-events` | Monitor deployment lifecycle events and status changes         | Release tracking, rollback decisions, scaling operations    |
+| `get-node-events`       | Track node-level events and cluster health indicators          | Node maintenance, capacity planning, hardware issues        |
 
 ### 📊 Prometheus Metrics
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `list-metrics` | Discover available metrics and their metadata | Metric exploration, dashboard creation, alerting setup |
-| `query-metrics` | Execute instant PromQL queries for real-time data | Performance monitoring, SLA tracking, capacity analysis |
-| `query-metrics-range` | Run time-series queries for historical analysis | Trend analysis, capacity planning, performance optimization |
+| Tool                  | Description                                       | Use Case                                                    |
+| --------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| `list-metrics`        | Discover available metrics and their metadata     | Metric exploration, dashboard creation, alerting setup      |
+| `query-metrics`       | Execute instant PromQL queries for real-time data | Performance monitoring, SLA tracking, capacity analysis     |
+| `query-metrics-range` | Run time-series queries for historical analysis   | Trend analysis, capacity planning, performance optimization |
 
 ### 📋 Elasticsearch Logs
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `search-logs` | Full-text search across all log messages | Error investigation, security analysis, compliance auditing |
-| `list-log-indices` | Discover available log indices and their structure | Log management, retention policies, index optimization |
-| `get-pod-logs` | Retrieve logs from specific Kubernetes pods | Application debugging, performance analysis, error tracking |
+| Tool               | Description                                        | Use Case                                                    |
+| ------------------ | -------------------------------------------------- | ----------------------------------------------------------- |
+| `search-logs`      | Full-text search across all log messages           | Error investigation, security analysis, compliance auditing |
+| `list-log-indices` | Discover available log indices and their structure | Log management, retention policies, index optimization      |
+| `get-pod-logs`     | Retrieve logs from specific Kubernetes pods        | Application debugging, performance analysis, error tracking |
 
 ### 🔍 Distributed Tracing
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `get-services` | List all available services in the tracing system | Service discovery, architecture analysis, dependency mapping |
-| `get-operations` | Retrieve available operations with span kinds | API analysis, performance profiling, service optimization |
-| `get-trace` | Fetch complete trace details by trace ID | Root cause analysis, performance bottleneck identification |
-| `find-traces` | Search traces based on various criteria | Error investigation, performance analysis, user journey tracking |
+| Tool             | Description                                       | Use Case                                                         |
+| ---------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| `get-services`   | List all available services in the tracing system | Service discovery, architecture analysis, dependency mapping     |
+| `get-operations` | Retrieve available operations with span kinds     | API analysis, performance profiling, service optimization        |
+| `get-trace`      | Fetch complete trace details by trace ID          | Root cause analysis, performance bottleneck identification       |
+| `find-traces`    | Search traces based on various criteria           | Error investigation, performance analysis, user journey tracking |
 
 ### Tool Naming Convention
 
@@ -278,7 +278,8 @@ traces:
 
 Set the following environment variables in production:
 
-**Note**: 
+**Note**:
+
 - Command line flags take precedence over environment variables. If both are specified, the command line flag value will be used.
 - By default, all modules are **disabled**. You need to explicitly enable modules using either command line flags or environment variables.
 
@@ -353,6 +354,36 @@ With the above configuration, the actual tool names will be:
 To use default tool names (no prefix/suffix), set both `prefix` and `suffix` to empty strings `""`.
 
 ## Usage Guide
+
+### Dynamic Module Selection Examples
+
+#### Using Query Parameters
+
+```bash
+# Connect to MCP server with all modules (default)
+ws://localhost:80/mcp
+
+# Connect with only SOPS and Events modules
+ws://localhost:80/mcp?enabled=sops,events
+
+# Connect with only Metrics module
+ws://localhost:80/mcp?enabled=metrics
+
+# Connect with multiple specific modules
+ws://localhost:80/mcp?enabled=logs,traces
+```
+
+#### Health Check with Query Parameters
+
+```bash
+# Check server status with all modules
+curl "http://localhost:80/mcp/healthz"
+
+# Check server status with specific modules
+curl "http://localhost:80/mcp/healthz?enabled=sops,events"
+
+# The response will show which modules are enabled for that request
+```
 
 ### Tool Call Examples
 
@@ -626,22 +657,26 @@ The MCP server URI path is configurable and affects all endpoints:
 #### Configuration Methods
 
 1. **Configuration File**:
+
 ```yaml
 server:
   uri: /custom-mcp
 ```
 
 2. **Environment Variable**:
+
 ```bash
 export SERVER_URI="/custom-mcp"
 ```
 
 3. **Command Line Flag**:
+
 ```bash
 ./ops-mcp-server --uri=/custom-mcp
 ```
 
 #### Priority Order
+
 Command line flags > Environment variables > Configuration file > Default values
 
 #### Example with Custom URI
@@ -655,9 +690,36 @@ export SERVER_URI="/api/mcp"
 
 # Endpoints will be:
 # - MCP: http://localhost:80/api/mcp
-# - Docs: http://localhost:80/api/mcp/docs  
+# - Docs: http://localhost:80/api/mcp/docs
 # - Health: http://localhost:80/api/mcp/healthz
 ```
+
+#### Dynamic Module Selection
+
+You can control which modules are enabled at runtime using query parameters:
+
+```bash
+# Enable all modules (default)
+http://localhost:80/mcp
+
+# Enable only specific modules
+http://localhost:80/mcp?enabled=sops,events
+http://localhost:80/mcp?enabled=metrics,logs
+http://localhost:80/mcp?enabled=traces
+
+# Enable single module
+http://localhost:80/mcp?enabled=sops
+```
+
+**Available modules:**
+
+- `sops` - Standard Operations
+- `events` - Kubernetes Events
+- `metrics` - Prometheus Metrics
+- `logs` - Elasticsearch Logs
+- `traces` - Jaeger Traces
+
+**Note:** Query parameters only work in SSE mode. In stdio mode, all configured modules are always enabled.
 
 #### URI Normalization
 
@@ -668,6 +730,7 @@ The server automatically normalizes URI paths for consistency:
 - **Empty URI defaults to**: `/mcp`
 
 Examples of equivalent configurations:
+
 ```bash
 # All of these result in the same endpoints:
 ./ops-mcp-server --uri /mcp
@@ -715,8 +778,35 @@ Health check response example:
     "logs": true,
     "traces": true
   },
+  "enabled_modules": {
+    "sops": true,
+    "events": true,
+    "metrics": true,
+    "logs": true,
+    "traces": true
+  },
+  "query_parameters": {
+    "enabled": "sops,events,metrics,logs,traces (default: all enabled)",
+    "example": "/mcp?enabled=sops,events"
+  },
   "tools_count": 14
 }
+```
+
+**Health check with query parameters:**
+
+```bash
+# Check with specific modules enabled
+curl "http://localhost:80/mcp/healthz?enabled=sops,events"
+
+# Response will show:
+# "enabled_modules": {
+#   "sops": true,
+#   "events": true,
+#   "metrics": false,
+#   "logs": false,
+#   "traces": false
+# }
 ```
 
 #### STDIO Mode
@@ -842,18 +932,21 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🎯 Why Choose Ops MCP Server?
 
 ### 🚀 **Immediate Value**
+
 - **⚡ 10x Faster Troubleshooting**: Get instant answers to complex operational questions
 - **🧠 AI-Powered Insights**: Leverage AI's pattern recognition for proactive issue detection
 - **🔄 24/7 Operations**: Never miss critical alerts with intelligent monitoring
 - **📊 Unified View**: Single interface for all your observability data
 
 ### 🏢 **Enterprise Benefits**
+
 - **🔒 Enterprise Security**: Role-based access, audit trails, and secure credential management
 - **📈 Scalable Architecture**: Handles high-volume production workloads with ease
 - **🛠️ Easy Integration**: Drop-in replacement for existing monitoring workflows
 - **💰 Cost Effective**: Reduce operational overhead and improve team productivity
 
 ### 🤖 **AI-First Design**
+
 - **💬 Natural Language**: Ask questions in plain English, get structured data back
 - **🧩 Modular**: Enable only the modules you need, customize as you grow
 - **🔄 Real-time**: Live data streaming for immediate operational insights
@@ -863,4 +956,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **🚀 Transform your AI assistant into an intelligent operations engineer today!**
 
-*Ready to revolutionize your operations workflow? [Get started now →](#quick-start)*
+_Ready to revolutionize your operations workflow? [Get started now →](#quick-start)_

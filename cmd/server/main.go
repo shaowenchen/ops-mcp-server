@@ -46,6 +46,60 @@ func normalizeURI(uri string) string {
 	return uri
 }
 
+// parseEnabledModules parses the enabled query parameter and returns a map of enabled modules
+func parseEnabledModules(queryParams string) map[string]bool {
+	enabled := map[string]bool{
+		"sops":    true, // default all enabled
+		"events":  true,
+		"metrics": true,
+		"logs":    true,
+		"traces":  true,
+	}
+
+	if queryParams == "" {
+		return enabled
+	}
+
+	// Parse query parameters
+	params := strings.Split(queryParams, "&")
+	for _, param := range params {
+		if strings.HasPrefix(param, "enabled=") {
+			enabledStr := strings.TrimPrefix(param, "enabled=")
+			if enabledStr == "" {
+				continue
+			}
+
+			// Reset all to false first
+			for k := range enabled {
+				enabled[k] = false
+			}
+
+			// Enable only specified modules
+			modules := strings.Split(enabledStr, ",")
+			for _, module := range modules {
+				module = strings.TrimSpace(module)
+				if module != "" {
+					enabled[module] = true
+				}
+			}
+			break
+		}
+	}
+
+	return enabled
+}
+
+// getEnabledModuleNames returns a slice of enabled module names
+func getEnabledModuleNames(enabled map[string]bool) []string {
+	var names []string
+	for module, isEnabled := range enabled {
+		if isEnabled {
+			names = append(names, module)
+		}
+	}
+	return names
+}
+
 var (
 	cfgFile string
 	logger  *zap.Logger
@@ -522,6 +576,10 @@ func runServer(cmd *cobra.Command, args []string) {
 			w.WriteHeader(http.StatusOK)
 
 			versionInfo := version.Get()
+
+			// Parse query parameters to show what modules would be enabled
+			enabledModules := parseEnabledModules(r.URL.RawQuery)
+
 			healthResponse := map[string]interface{}{
 				"status":     "ok",
 				"service":    "ops-mcp-server",
@@ -542,7 +600,12 @@ func runServer(cmd *cobra.Command, args []string) {
 					"logs":    cfg.Logs.Enabled,
 					"traces":  cfg.Traces.Enabled,
 				},
-				"tools_count": toolCount,
+				"enabled_modules": enabledModules,
+				"tools_count":     toolCount,
+				"query_parameters": map[string]interface{}{
+					"enabled": "sops,events,metrics,logs,traces (default: all enabled)",
+					"example": mcpURI + "?enabled=sops,events",
+				},
 			}
 
 			json.NewEncoder(w).Encode(healthResponse)
@@ -554,16 +617,156 @@ func runServer(cmd *cobra.Command, args []string) {
 			Handler: mux,
 		}
 
-		// Create Streamable HTTP MCP server with custom server
-		streamableServer := server.NewStreamableHTTPServer(
-			mcpServer,
-			server.WithStreamableHTTPServer(httpServer),
-			server.WithEndpointPath(mcpURI),
-			server.WithHeartbeatInterval(3*time.Second),
-		)
+		// Create a custom MCP handler that can parse query parameters
+		mcpHandler := func(w http.ResponseWriter, r *http.Request) {
+			// Parse query parameters to determine enabled modules
+			enabledModules := parseEnabledModules(r.URL.RawQuery)
+
+			// Create a new MCP server instance for this request
+			requestMCPServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
+
+			// Register modules based on query parameters
+			var toolCount int
+			var enabledTools []string
+
+			if enabledModules["sops"] && cfg.Sops.Enabled {
+				sopsConfig := &sopsModule.Config{
+					Tools: sopsModule.ToolsConfig{
+						Prefix: cfg.Sops.Tools.Prefix,
+						Suffix: cfg.Sops.Tools.Suffix,
+					},
+				}
+				if cfg.Sops.Ops != nil {
+					sopsConfig.Endpoint = cfg.Sops.Ops.Endpoint
+					sopsConfig.Token = cfg.Sops.Ops.Token
+				}
+				sopsModuleInstance, err := sopsModule.New(sopsConfig, logger)
+				if err == nil {
+					sopsModuleTools := sopsModuleInstance.GetTools()
+					for _, serverTool := range sopsModuleTools {
+						requestMCPServer.AddTool(serverTool.Tool, serverTool.Handler)
+						enabledTools = append(enabledTools, serverTool.Tool.Name)
+						toolCount++
+					}
+				}
+			}
+
+			if enabledModules["events"] && cfg.Events.Enabled {
+				eventsConfig := &eventsModule.Config{
+					PollInterval: 30 * time.Second,
+					Tools: eventsModule.ToolsConfig{
+						Prefix: cfg.Events.Tools.Prefix,
+						Suffix: cfg.Events.Tools.Suffix,
+					},
+				}
+				if cfg.Events.Ops != nil {
+					eventsConfig.Endpoint = cfg.Events.Ops.Endpoint
+					eventsConfig.Token = cfg.Events.Ops.Token
+				}
+				eventsModuleInstance, err := eventsModule.New(eventsConfig, logger)
+				if err == nil {
+					eventsModuleTools := eventsModuleInstance.GetTools()
+					for _, serverTool := range eventsModuleTools {
+						requestMCPServer.AddTool(serverTool.Tool, serverTool.Handler)
+						enabledTools = append(enabledTools, serverTool.Tool.Name)
+						toolCount++
+					}
+				}
+			}
+
+			if enabledModules["metrics"] && cfg.Metrics.Enabled {
+				metricsConfig := &metricsModule.Config{
+					Tools: metricsModule.ToolsConfig{
+						Prefix: cfg.Metrics.Tools.Prefix,
+						Suffix: cfg.Metrics.Tools.Suffix,
+					},
+				}
+				if cfg.Metrics.Prometheus != nil {
+					metricsConfig.Prometheus = &metricsModule.PrometheusConfig{
+						Endpoint: cfg.Metrics.Prometheus.Endpoint,
+					}
+				}
+				metricsModuleInstance, err := metricsModule.New(metricsConfig, logger)
+				if err == nil {
+					metricsModuleTools := metricsModuleInstance.GetTools()
+					for _, serverTool := range metricsModuleTools {
+						requestMCPServer.AddTool(serverTool.Tool, serverTool.Handler)
+						enabledTools = append(enabledTools, serverTool.Tool.Name)
+						toolCount++
+					}
+				}
+			}
+
+			if enabledModules["logs"] && cfg.Logs.Enabled {
+				logsConfig := &logsModule.Config{
+					Tools: logsModule.ToolsConfig{
+						Prefix: cfg.Logs.Tools.Prefix,
+						Suffix: cfg.Logs.Tools.Suffix,
+					},
+				}
+				if cfg.Logs.Elasticsearch != nil {
+					logsConfig.Elasticsearch = &logsModule.ElasticsearchConfig{
+						Endpoint: cfg.Logs.Elasticsearch.Endpoint,
+						Username: cfg.Logs.Elasticsearch.Username,
+						Password: cfg.Logs.Elasticsearch.Password,
+						APIKey:   cfg.Logs.Elasticsearch.APIKey,
+						Timeout:  cfg.Logs.Elasticsearch.Timeout,
+					}
+				}
+				logsModuleInstance, err := logsModule.New(logsConfig, logger)
+				if err == nil {
+					logsModuleTools := logsModuleInstance.GetTools()
+					for _, serverTool := range logsModuleTools {
+						requestMCPServer.AddTool(serverTool.Tool, serverTool.Handler)
+						enabledTools = append(enabledTools, serverTool.Tool.Name)
+						toolCount++
+					}
+				}
+			}
+
+			if enabledModules["traces"] && cfg.Traces.Enabled {
+				tracesConfig := &tracesModule.Config{
+					Tools: tracesModule.ToolsConfig{
+						Prefix: cfg.Traces.Tools.Prefix,
+						Suffix: cfg.Traces.Tools.Suffix,
+					},
+				}
+				if cfg.Traces.Jaeger != nil {
+					tracesConfig.Endpoint = cfg.Traces.Jaeger.Endpoint
+					tracesConfig.Protocol = "HTTP"
+					tracesConfig.Port = 16686
+					tracesConfig.Timeout = cfg.Traces.Jaeger.Timeout
+				}
+				tracesModuleInstance, err := tracesModule.New(tracesConfig, logger)
+				if err == nil {
+					tracesModuleTools := tracesModuleInstance.GetTools()
+					for _, serverTool := range tracesModuleTools {
+						requestMCPServer.AddTool(serverTool.Tool, serverTool.Handler)
+						enabledTools = append(enabledTools, serverTool.Tool.Name)
+						toolCount++
+					}
+				}
+			}
+
+			// Log the request with enabled modules
+			logger.Info("MCP request with enabled modules",
+				zap.String("query", r.URL.RawQuery),
+				zap.Strings("enabled_modules", getEnabledModuleNames(enabledModules)),
+				zap.Int("tools_count", toolCount),
+				zap.Strings("tools", enabledTools))
+
+			// Create Streamable HTTP MCP server for this request
+			streamableServer := server.NewStreamableHTTPServer(
+				requestMCPServer,
+				server.WithHeartbeatInterval(3*time.Second),
+			)
+
+			// Serve the request
+			streamableServer.ServeHTTP(w, r)
+		}
 
 		// Mount MCP handler to the mux
-		mux.Handle(mcpURI, streamableServer)
+		mux.Handle(mcpURI, http.HandlerFunc(mcpHandler))
 
 		// Add docs endpoint
 		docsHandler := docs.NewHandler(&cfg, logger)
@@ -576,7 +779,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			zap.String("mcp_endpoint", mcpURI),
 			zap.String("docs_endpoint", mcpURI+"/docs"))
 
-		if err := streamableServer.Start(httpServer.Addr); err != nil {
+		if err := httpServer.ListenAndServe(); err != nil {
 			logger.Fatal("SSE server failed to start", zap.Error(err))
 		}
 	default:
