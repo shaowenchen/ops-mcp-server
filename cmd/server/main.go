@@ -239,6 +239,9 @@ func initConfig() {
 func runServer(cmd *cobra.Command, args []string) {
 	defer logger.Sync()
 
+	// Get log level for debug logging
+	logLevel := viper.GetString("log.level")
+
 	// Load configuration
 	var cfg config.Config
 	if err := viper.Unmarshal(&cfg); err != nil {
@@ -635,15 +638,59 @@ func runServer(cmd *cobra.Command, args []string) {
 			server.WithUseFullURLForMessageEndpoint(true),
 		)
 
-		// Add SSE and message endpoints using the SSE server handlers
+		// Add SSE and message endpoints using the SSE server handlers with debug logging
 		sseEndpoint := mcpURI + "/sse"
 		messageEndpoint := mcpURI + "/message"
 
-		mux.Handle(sseEndpoint, sseServer.SSEHandler())
-		mux.Handle(messageEndpoint, sseServer.MessageHandler())
+		// Create wrapped handlers with debug logging
+		sseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if logLevel == "debug" {
+				logger.Debug("SSE connection request",
+					zap.String("method", r.Method),
+					zap.String("url", r.URL.String()),
+					zap.String("remote_addr", r.RemoteAddr),
+					zap.String("user_agent", r.UserAgent()),
+					zap.Strings("headers", getHeaderStrings(r.Header)),
+				)
+			}
+			sseServer.SSEHandler().ServeHTTP(w, r)
+		})
+
+		messageHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if logLevel == "debug" {
+				logger.Debug("Message endpoint request",
+					zap.String("method", r.Method),
+					zap.String("url", r.URL.String()),
+					zap.String("remote_addr", r.RemoteAddr),
+					zap.String("user_agent", r.UserAgent()),
+					zap.String("content_type", r.Header.Get("Content-Type")),
+					zap.String("content_length", r.Header.Get("Content-Length")),
+					zap.Strings("headers", getHeaderStrings(r.Header)),
+				)
+			}
+			sseServer.MessageHandler().ServeHTTP(w, r)
+		})
+
+		mux.Handle(sseEndpoint, sseHandler)
+		mux.Handle(messageEndpoint, messageHandler)
 
 		// Create a custom MCP handler that can parse query parameters
 		mcpHandler := func(w http.ResponseWriter, r *http.Request) {
+			// Log detailed request information in debug mode
+			if logLevel == "debug" {
+				logger.Debug("Incoming MCP request",
+					zap.String("method", r.Method),
+					zap.String("url", r.URL.String()),
+					zap.String("path", r.URL.Path),
+					zap.String("query", r.URL.RawQuery),
+					zap.String("remote_addr", r.RemoteAddr),
+					zap.String("user_agent", r.UserAgent()),
+					zap.String("content_type", r.Header.Get("Content-Type")),
+					zap.String("content_length", r.Header.Get("Content-Length")),
+					zap.Strings("headers", getHeaderStrings(r.Header)),
+				)
+			}
+
 			// Parse query parameters to determine enabled modules
 			enabledModules := parseEnabledModules(r.URL.RawQuery)
 
@@ -787,7 +834,20 @@ func runServer(cmd *cobra.Command, args []string) {
 			)
 
 			// Serve the request
+			startTime := time.Now()
 			streamableServer.ServeHTTP(w, r)
+
+			// Log request completion in debug mode
+			if logLevel == "debug" {
+				duration := time.Since(startTime)
+				logger.Debug("MCP request completed",
+					zap.String("method", r.Method),
+					zap.String("path", r.URL.Path),
+					zap.Duration("duration", duration),
+					zap.Strings("enabled_modules", getEnabledModuleNames(enabledModules)),
+					zap.Int("tools_count", toolCount),
+				)
+			}
 		}
 
 		// Mount MCP handler to the mux
@@ -812,6 +872,17 @@ func runServer(cmd *cobra.Command, args []string) {
 	default:
 		logger.Fatal("Invalid server mode", zap.String("mode", serverMode), zap.Strings("valid_modes", []string{"stdio", "sse"}))
 	}
+}
+
+// getHeaderStrings converts http.Header to []string for logging
+func getHeaderStrings(headers http.Header) []string {
+	var headerStrings []string
+	for name, values := range headers {
+		for _, value := range values {
+			headerStrings = append(headerStrings, fmt.Sprintf("%s: %s", name, value))
+		}
+	}
+	return headerStrings
 }
 
 func main() {
