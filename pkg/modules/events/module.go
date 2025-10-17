@@ -73,14 +73,12 @@ func (m *Module) makeRequest(ctx context.Context, method, path string, body inte
 // makeRequestWithFullURL creates and executes an HTTP request with authentication using full URL
 func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
-	var bodyStr string
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewBuffer(jsonData)
-		bodyStr = string(jsonData)
 	}
 
 	// Log request details
@@ -89,38 +87,13 @@ func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string,
 		authMethod = "bearer_token"
 	}
 
-	m.logger.Info("🎪 Making Events API Request",
+	m.logger.Info("Making Events API Request",
 		zap.String("method", method),
 		zap.String("full_url", url),
 		zap.String("endpoint", m.config.Endpoint),
 		zap.Bool("has_body", body != nil),
 		zap.Bool("has_token", m.config.Token != ""),
 		zap.String("auth_method", authMethod))
-
-	// Also print to console for visibility
-	fmt.Printf("🔍 Events API Call: %s %s\n", method, url)
-	if m.config.Token != "" {
-		fmt.Printf("🔐 Authorization: Bearer [TOKEN_PRESENT]\n")
-	} else {
-		fmt.Printf("⚠️  No Authorization token configured\n")
-	}
-	if bodyStr != "" {
-		// Pretty print JSON body if it's not too long
-		if len(bodyStr) < 500 {
-			var prettyBody interface{}
-			if err := json.Unmarshal([]byte(bodyStr), &prettyBody); err == nil {
-				if prettyJSON, err := json.MarshalIndent(prettyBody, "", "  "); err == nil {
-					fmt.Printf("📋 Request Body:\n%s\n", string(prettyJSON))
-				} else {
-					fmt.Printf("📋 Request Body: %s\n", bodyStr)
-				}
-			} else {
-				fmt.Printf("📋 Request Body: %s\n", bodyStr)
-			}
-		} else {
-			fmt.Printf("📋 Request Body Length: %d bytes\n", len(bodyStr))
-		}
-	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
@@ -138,24 +111,21 @@ func (m *Module) makeRequestWithFullURL(ctx context.Context, method, url string,
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		m.logger.Error("❌ Events API Request Failed",
+		m.logger.Error("Events API Request Failed",
 			zap.String("method", method),
 			zap.String("url", url),
 			zap.Error(err))
-		fmt.Printf("❌ Events API Request Failed: %s %s - %v\n", method, url, err)
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
 	// Log response details
-	m.logger.Info("✅ Events API Response Received",
+	m.logger.Info("Events API Response Received",
 		zap.String("method", method),
 		zap.String("url", url),
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("status", resp.Status),
 		zap.String("auth_method", authMethod),
 		zap.Int64("content_length", resp.ContentLength))
-
-	fmt.Printf("✅ Events API Response: %d %s\n", resp.StatusCode, resp.Status)
 
 	return resp, nil
 }
@@ -276,7 +246,7 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 		}
 	}
 
-	m.logger.Info("🌐 Making API Request",
+	m.logger.Info("Making API Request",
 		zap.String("full_url", url),
 		zap.String("base_endpoint", m.config.Endpoint),
 		zap.String("subject_pattern", subjectPattern),
@@ -287,10 +257,6 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 		zap.Int("limit", req.Limit),
 		zap.Int("offset", req.Offset),
 		zap.String("start_time", req.StartTime))
-
-	// Also print to console for visibility
-	fmt.Printf("🎯 Subject Pattern: %s\n", subjectPattern)
-	fmt.Printf("🔍 Full API Query URL: %s\n", url)
 
 	resp, err := m.makeRequestWithFullURL(ctx, "GET", url, nil)
 	if err != nil {
@@ -348,7 +314,6 @@ func (m *Module) handleListEvents(ctx context.Context, request mcp.CallToolReque
 	args := request.GetArguments()
 
 	// Log incoming request
-	fmt.Printf("📥 Received list events request with args: %+v\n", args)
 	m.logger.Info("Processing list events request",
 		zap.Any("arguments", args))
 
@@ -393,16 +358,13 @@ func (m *Module) handleListEvents(ctx context.Context, request mcp.CallToolReque
 		}
 	}
 
-	m.logger.Info("🌐 Making List Events API Request",
+	m.logger.Info("Making List Events API Request",
 		zap.String("full_url", url),
 		zap.String("base_endpoint", m.config.Endpoint),
 		zap.Any("query_params", queryParams),
 		zap.String("search", search),
 		zap.Int("page_size", pageSize),
 		zap.Int("page", page))
-
-	// Also print to console for visibility
-	fmt.Printf("🎯 List Events API Query URL: %s\n", url)
 
 	resp, err := m.makeRequestWithFullURL(ctx, "GET", url, nil)
 	if err != nil {
@@ -424,7 +386,6 @@ func (m *Module) handleListEvents(ctx context.Context, request mcp.CallToolReque
 	}
 
 	// Log response summary
-	fmt.Printf("✅ Successfully fetched event types from API (response size: %d bytes)\n", len(body))
 
 	// Return the raw response from the API
 	return &mcp.CallToolResult{
@@ -441,7 +402,6 @@ func (m *Module) handleGetEvents(ctx context.Context, request mcp.CallToolReques
 	args := request.GetArguments()
 
 	// Log incoming request
-	fmt.Printf("📥 Received get events request with args: %+v\n", args)
 	m.logger.Info("Processing get events request",
 		zap.Any("arguments", args))
 
@@ -488,16 +448,6 @@ func (m *Module) handleGetEvents(ctx context.Context, request mcp.CallToolReques
 	}
 
 	// Log response summary
-	fmt.Printf("✅ Successfully fetched %d events using pattern '%s' (total available: %d)\n",
-		len(response.Data.List), subjectPattern, response.Data.Total)
-
-	if len(response.Data.List) > 0 {
-		sample := response.Data.List[0]
-		fmt.Printf("📋 Sample event - Subject: %s\n", sample.Subject)
-		fmt.Printf("🔍 Parsed info - Cluster: %s, Namespace: %s, Resource: %s, Name: %s\n",
-			sample.ParsedInfo.Cluster, sample.ParsedInfo.Namespace,
-			sample.ParsedInfo.Resource, sample.ParsedInfo.Name)
-	}
 
 	data, err := json.Marshal(response)
 	if err != nil {

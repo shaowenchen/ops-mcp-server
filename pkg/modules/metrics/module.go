@@ -76,43 +76,21 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 	url := m.config.Prometheus.Endpoint + path
 
 	var reqBody io.Reader
-	var bodyStr string
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewBuffer(jsonData)
-		bodyStr = string(jsonData)
 	}
 
 	// Log request details
-	m.logger.Info("🎯 Making Prometheus Request",
+	m.logger.Info("Making Prometheus Request",
 		zap.String("method", method),
 		zap.String("full_url", url),
 		zap.String("path", path),
 		zap.String("endpoint", m.config.Prometheus.Endpoint),
 		zap.Bool("has_body", body != nil))
-
-	// Also print to console for visibility
-	fmt.Printf("🔍 Prometheus API Call: %s %s\n", method, url)
-	if bodyStr != "" {
-		// Pretty print JSON body if it's not too long
-		if len(bodyStr) < 500 {
-			var prettyBody interface{}
-			if err := json.Unmarshal([]byte(bodyStr), &prettyBody); err == nil {
-				if prettyJSON, err := json.MarshalIndent(prettyBody, "", "  "); err == nil {
-					fmt.Printf("📋 Request Body:\n%s\n", string(prettyJSON))
-				} else {
-					fmt.Printf("📋 Request Body: %s\n", bodyStr)
-				}
-			} else {
-				fmt.Printf("📋 Request Body: %s\n", bodyStr)
-			}
-		} else {
-			fmt.Printf("📋 Request Body Length: %d bytes\n", len(bodyStr))
-		}
-	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
@@ -125,23 +103,20 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		m.logger.Error("❌ Prometheus Request Failed",
+		m.logger.Error("Prometheus Request Failed",
 			zap.String("method", method),
 			zap.String("url", url),
 			zap.Error(err))
-		fmt.Printf("❌ Prometheus Request Failed: %s %s - %v\n", method, url, err)
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
 	// Log response details
-	m.logger.Info("✅ Prometheus Response Received",
+	m.logger.Info("Prometheus Response Received",
 		zap.String("method", method),
 		zap.String("url", url),
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("status", resp.Status),
 		zap.Int64("content_length", resp.ContentLength))
-
-	fmt.Printf("✅ Prometheus Response: %d %s\n", resp.StatusCode, resp.Status)
 
 	return resp, nil
 }
@@ -165,7 +140,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 
 	fullURL := m.config.Prometheus.Endpoint + path + "?" + queryParams.Encode()
 
-	m.logger.Info("🔍 Executing Prometheus Query",
+	m.logger.Info("Executing Prometheus Query",
 		zap.String("url", fullURL),
 		zap.String("query", query),
 		zap.String("query_type", queryType),
@@ -173,7 +148,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 
 	resp, err := m.makePrometheusRequest(ctx, "GET", path+"?"+queryParams.Encode(), nil)
 	if err != nil {
-		m.logger.Error("❌ Prometheus query failed",
+		m.logger.Error("Prometheus query failed",
 			zap.String("query", query),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
@@ -181,7 +156,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		m.logger.Error("❌ Prometheus API returned non-200 status",
+		m.logger.Error("Prometheus API returned non-200 status",
 			zap.String("query", query),
 			zap.Int("status_code", resp.StatusCode))
 		return nil, fmt.Errorf("Prometheus API returned status %d", resp.StatusCode)
@@ -190,7 +165,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		m.logger.Error("❌ Failed to read response body",
+		m.logger.Error("Failed to read response body",
 			zap.String("query", query),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to read response body: %w", err)
@@ -198,7 +173,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 
 	var promResp PrometheusResponse
 	if err := json.Unmarshal(respBody, &promResp); err != nil {
-		m.logger.Error("❌ Failed to decode Prometheus response",
+		m.logger.Error("Failed to decode Prometheus response",
 			zap.String("query", query),
 			zap.Error(err),
 			zap.String("response_body", string(respBody)))
@@ -214,7 +189,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 	}
 
 	if promResp.Status == "success" {
-		m.logger.Info("✅ Prometheus Query Successful",
+		m.logger.Info("Prometheus Query Successful",
 			zap.String("query", query),
 			zap.String("status", promResp.Status),
 			zap.String("result_type", promResp.Data.ResultType),
@@ -243,7 +218,7 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 			}
 		}
 	} else {
-		m.logger.Warn("⚠️ Prometheus Query Warning",
+		m.logger.Warn("Prometheus Query Warning",
 			zap.String("query", query),
 			zap.String("status", promResp.Status),
 			zap.String("error", promResp.Error),
@@ -286,20 +261,20 @@ func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequ
 		}
 	}
 
-	m.logger.Info("📋 Listing available metrics",
+	m.logger.Info("Listing available metrics",
 		zap.String("search_filter", searchFilter),
 		zap.Int("limit", limit))
 
 	// Query Prometheus metadata API to get all metrics
 	resp, err := m.makePrometheusRequest(ctx, "GET", "/api/v1/label/__name__/values", nil)
 	if err != nil {
-		m.logger.Error("❌ Failed to query metrics list", zap.Error(err))
+		m.logger.Error("Failed to query metrics list", zap.Error(err))
 		return nil, fmt.Errorf("failed to query metrics list: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		m.logger.Error("❌ Prometheus API returned non-200 status",
+		m.logger.Error("Prometheus API returned non-200 status",
 			zap.Int("status_code", resp.StatusCode))
 		return nil, fmt.Errorf("Prometheus API returned status %d", resp.StatusCode)
 	}
@@ -307,7 +282,7 @@ func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequ
 	// Read and parse response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		m.logger.Error("❌ Failed to read response body", zap.Error(err))
+		m.logger.Error("Failed to read response body", zap.Error(err))
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
@@ -317,14 +292,14 @@ func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequ
 	}
 
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		m.logger.Error("❌ Failed to decode response",
+		m.logger.Error("Failed to decode response",
 			zap.Error(err),
 			zap.String("response_body", string(respBody)))
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if apiResp.Status != "success" {
-		m.logger.Error("❌ API request failed",
+		m.logger.Error("API request failed",
 			zap.String("status", apiResp.Status))
 		return nil, fmt.Errorf("API request failed with status: %s", apiResp.Status)
 	}
@@ -356,7 +331,7 @@ func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequ
 		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	m.logger.Info("✅ Metrics list completed successfully",
+	m.logger.Info("Metrics list completed successfully",
 		zap.Int("returned_count", len(filteredMetrics)),
 		zap.Int("total_available", len(apiResp.Data)))
 
@@ -378,7 +353,7 @@ func (m *Module) handleExecuteQuery(ctx context.Context, request mcp.CallToolReq
 		return nil, fmt.Errorf("query parameter is required")
 	}
 
-	m.logger.Info("🔍 Executing PromQL instant query",
+	m.logger.Info("Executing PromQL instant query",
 		zap.String("query", query))
 
 	// Execute instant query
@@ -387,7 +362,7 @@ func (m *Module) handleExecuteQuery(ctx context.Context, request mcp.CallToolReq
 
 	promResp, err := m.queryPrometheus(ctx, query, "query", params)
 	if err != nil {
-		m.logger.Error("❌ Failed to execute PromQL query",
+		m.logger.Error("Failed to execute PromQL query",
 			zap.String("query", query),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to execute query: %w", err)
@@ -411,7 +386,7 @@ func (m *Module) handleExecuteQuery(ctx context.Context, request mcp.CallToolReq
 		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	m.logger.Info("✅ PromQL instant query completed successfully",
+	m.logger.Info("PromQL instant query completed successfully",
 		zap.String("query", query),
 		zap.String("status", promResp.Status))
 
@@ -444,7 +419,7 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 		step = stepArg
 	}
 
-	m.logger.Info("🔍 Executing PromQL range query",
+	m.logger.Info("Executing PromQL range query",
 		zap.String("query", query),
 		zap.String("time_range", timeRange),
 		zap.String("step", step))
@@ -475,7 +450,7 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 
 	promResp, err := m.queryPrometheus(ctx, query, "query_range", params)
 	if err != nil {
-		m.logger.Error("❌ Failed to execute PromQL range query",
+		m.logger.Error("Failed to execute PromQL range query",
 			zap.String("query", query),
 			zap.String("time_range", timeRange),
 			zap.Error(err))
@@ -503,7 +478,7 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	m.logger.Info("✅ PromQL range query completed successfully",
+	m.logger.Info("PromQL range query completed successfully",
 		zap.String("query", query),
 		zap.String("time_range", timeRange),
 		zap.String("status", promResp.Status))
