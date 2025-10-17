@@ -34,6 +34,8 @@ graph TB
     subgraph "🚀 Ops MCP Server"
         subgraph "🌐 Transport Layer"
             HTTP["HTTP/SSE Server<br/>:80"]
+            SSE["SSE Endpoint<br/>/mcp/sse"]
+            MSG["Message Endpoint<br/>/mcp/message"]
             STDIO["STDIO Interface"]
         end
 
@@ -79,6 +81,8 @@ graph TB
 
     %% MCP to server
     MCP --> HTTP
+    MCP --> SSE
+    MCP --> MSG
     MCP --> STDIO
 
     %% Server internal flow
@@ -382,6 +386,14 @@ curl "http://localhost:80/mcp/healthz"
 # Check server status with specific modules
 curl "http://localhost:80/mcp/healthz?enabled=sops,events"
 
+# Test SSE endpoint (first 5 seconds)
+timeout 5s curl -N -H "Accept: text/event-stream" http://localhost:80/mcp/sse
+
+# Test message endpoint
+curl -X POST http://localhost:80/mcp/message \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
 # The response will show which modules are enabled for that request
 ```
 
@@ -425,9 +437,44 @@ const traces = await mcpClient.callTool("find-traces-from-jaeger", {
 });
 ```
 
-### Claude Desktop Integration Example
+### Client Configuration
 
-Using this MCP server in Claude Desktop:
+#### SSE Mode (Recommended for Web Clients)
+
+For web-based MCP clients or applications that need real-time communication:
+
+**Server Endpoints:**
+- **SSE Connection**: `http://localhost:80/mcp/sse`
+- **Message**: `http://localhost:80/mcp/message`
+- **Health Check**: `http://localhost:80/mcp/healthz`
+- **Documentation**: `http://localhost:80/mcp/docs`
+
+**Client Configuration Example:**
+```javascript
+// JavaScript/TypeScript client
+const eventSource = new EventSource('http://localhost:80/mcp/sse');
+
+eventSource.addEventListener('endpoint', function(event) {
+    const messageEndpoint = event.data; // e.g., "/mcp/message/?session_id=xxx"
+    console.log('Message endpoint:', messageEndpoint);
+});
+
+// Send MCP messages to the message endpoint
+async function sendMCPMessage(message) {
+    const response = await fetch('http://localhost:80/mcp/message', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message)
+    });
+    return response.json();
+}
+```
+
+#### STDIO Mode (For Claude Desktop)
+
+For direct MCP client integration (such as Claude Desktop):
 
 ```json
 {
@@ -465,6 +512,7 @@ Using this MCP server in Claude Desktop:
         "--env",
         "TRACES_JAEGER_TIMEOUT=30",
         "shaowenchen/ops-mcp-server:latest",
+        "--mode=stdio",
         "--enable-sops",
         "--enable-events",
         "--enable-metrics",
@@ -571,7 +619,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:80/healthz",
+          "http://localhost:80/mcp/healthz",
         ]
       interval: 30s
       timeout: 3s
@@ -768,6 +816,8 @@ Health check response example:
   "mode": "sse",
   "endpoints": {
     "mcp": "/mcp",
+    "sse": "/mcp/sse",
+    "message": "/mcp/message",
     "docs": "/mcp/docs",
     "health": "/mcp/healthz"
   },

@@ -589,9 +589,11 @@ func runServer(cmd *cobra.Command, args []string) {
 				"timestamp":  time.Now().UTC().Format(time.RFC3339),
 				"mode":       serverMode,
 				"endpoints": map[string]string{
-					"mcp":    mcpURI,
-					"docs":   mcpURI + "/docs",
-					"health": healthEndpoint,
+					"mcp":     mcpURI,
+					"sse":     mcpURI + "/sse",
+					"message": mcpURI + "/message",
+					"docs":    mcpURI + "/docs",
+					"health":  healthEndpoint,
 				},
 				"modules": map[string]bool{
 					"sops":    cfg.Sops.Enabled,
@@ -611,11 +613,34 @@ func runServer(cmd *cobra.Command, args []string) {
 			json.NewEncoder(w).Encode(healthResponse)
 		})
 
-		// Create custom HTTP server
+		// Create custom HTTP server with optimized timeouts for MCP
 		httpServer := &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+			Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 			Handler: mux,
+			// Optimized timeouts for MCP server to reduce TIME_WAIT connections
+			ReadTimeout:       60 * time.Second,  // Allow time for MCP message processing
+			WriteTimeout:      60 * time.Second,  // Allow time for MCP response generation
+			IdleTimeout:       300 * time.Second, // 5 minutes for SSE connections
+			ReadHeaderTimeout: 10 * time.Second,  // Quick header validation
 		}
+
+		// Create SSE server with dynamic base path
+		sseServer := server.NewSSEServer(
+			mcpServer,
+			server.WithDynamicBasePath(func(r *http.Request, sessionID string) string {
+				// Use the configured MCP URI as the base path
+				return mcpURI
+			}),
+			server.WithBaseURL(fmt.Sprintf(":%d", cfg.Server.Port)),
+			server.WithUseFullURLForMessageEndpoint(true),
+		)
+
+		// Add SSE and message endpoints using the SSE server handlers
+		sseEndpoint := mcpURI + "/sse"
+		messageEndpoint := mcpURI + "/message"
+
+		mux.Handle(sseEndpoint, sseServer.SSEHandler())
+		mux.Handle(messageEndpoint, sseServer.MessageHandler())
 
 		// Create a custom MCP handler that can parse query parameters
 		mcpHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -777,6 +802,8 @@ func runServer(cmd *cobra.Command, args []string) {
 			zap.String("address", httpServer.Addr),
 			zap.String("health_endpoint", healthEndpoint),
 			zap.String("mcp_endpoint", mcpURI),
+			zap.String("sse_endpoint", sseEndpoint),
+			zap.String("message_endpoint", messageEndpoint),
 			zap.String("docs_endpoint", mcpURI+"/docs"))
 
 		if err := httpServer.ListenAndServe(); err != nil {
