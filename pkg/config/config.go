@@ -28,10 +28,11 @@ type LogConfig struct {
 
 // ServerConfig contains server configuration
 type ServerConfig struct {
-	Host string `mapstructure:"host" json:"host" yaml:"host"`
-	Port int    `mapstructure:"port" json:"port" yaml:"port"`
-	Mode string `mapstructure:"mode" json:"mode" yaml:"mode"`
-	URI  string `mapstructure:"uri" json:"uri" yaml:"uri"`
+	Host  string `mapstructure:"host" json:"host" yaml:"host"`
+	Port  int    `mapstructure:"port" json:"port" yaml:"port"`
+	Mode  string `mapstructure:"mode" json:"mode" yaml:"mode"`
+	URI   string `mapstructure:"uri" json:"uri" yaml:"uri"`
+	Token string `mapstructure:"token" json:"token" yaml:"token"`
 }
 
 // EventsOpsConfig contains Ops backend configuration for events

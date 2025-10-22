@@ -176,18 +176,16 @@ func init() {
 }
 
 func initConfig() {
-	// Enable automatic environment variable support first
-	viper.AutomaticEnv()
-
 	// Set environment variable key mapping for nested config
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Set up specific environment variable mappings
+	// Set up specific environment variable mappings (only when env vars are set)
 	viper.BindEnv("log.level", "LOG_LEVEL")
 	viper.BindEnv("server.host", "SERVER_HOST")
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("server.mode", "SERVER_MODE")
 	viper.BindEnv("server.uri", "SERVER_URI")
+	viper.BindEnv("server.token", "SERVER_TOKEN")
 	viper.BindEnv("sops.ops.endpoint", "SOPS_OPS_ENDPOINT")
 	viper.BindEnv("sops.ops.token", "SOPS_OPS_TOKEN")
 	viper.BindEnv("events.ops.endpoint", "EVENTS_OPS_ENDPOINT")
@@ -671,8 +669,9 @@ func runServer(cmd *cobra.Command, args []string) {
 			sseServer.MessageHandler().ServeHTTP(w, r)
 		})
 
-		mux.Handle(sseEndpoint, sseHandler)
-		mux.Handle(messageEndpoint, messageHandler)
+		// Apply authentication middleware to SSE and message endpoints
+		mux.Handle(sseEndpoint, authMiddleware(cfg.Server.Token)(sseHandler))
+		mux.Handle(messageEndpoint, authMiddleware(cfg.Server.Token)(messageHandler))
 
 		// Create a custom MCP handler that can parse query parameters
 		mcpHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -850,8 +849,8 @@ func runServer(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		// Mount MCP handler to the mux
-		mux.Handle(mcpURI, http.HandlerFunc(mcpHandler))
+		// Mount MCP handler to the mux with authentication middleware
+		mux.Handle(mcpURI, authMiddleware(cfg.Server.Token)(http.HandlerFunc(mcpHandler)))
 
 		// Add docs endpoint
 		docsHandler := docs.NewHandler(&cfg, logger)
@@ -883,6 +882,48 @@ func getHeaderStrings(headers http.Header) []string {
 		}
 	}
 	return headerStrings
+}
+
+// authMiddleware creates an authentication middleware that validates the server token
+func authMiddleware(expectedToken string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip authentication if no token is configured
+			if expectedToken == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Get token from Authorization header (Bearer token)
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, "Authorization header required", http.StatusUnauthorized)
+				return
+			}
+
+			// Check for Bearer token format
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				http.Error(w, "Invalid authorization format. Expected 'Bearer <token>'", http.StatusUnauthorized)
+				return
+			}
+
+			// Extract token
+			token := strings.TrimPrefix(authHeader, "Bearer ")
+			if token == "" {
+				http.Error(w, "Token required", http.StatusUnauthorized)
+				return
+			}
+
+			// Validate token
+			if token != expectedToken {
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
+
+			// Token is valid, proceed to next handler
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func main() {

@@ -59,6 +59,7 @@ server:
   port: 80
   mode: sse
   uri: /mcp
+  # token: "${SERVER_TOKEN}"  # Optional: Uncomment to enable authentication
 
 # Enable modules
 sops:
@@ -127,7 +128,59 @@ export EVENTS_OPS_TOKEN="your-token"
 export LOGS_ELASTICSEARCH_USERNAME="elastic"
 export LOGS_ELASTICSEARCH_PASSWORD="your-password"
 export TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com"
+# export SERVER_TOKEN="your-server-token"  # Optional: Uncomment to enable authentication
 ```
+
+## Authentication
+
+The MCP server supports optional token-based authentication. By default, no authentication is required. When a `token` is configured in the server configuration, protected endpoints will require a valid `Authorization` header with a Bearer token.
+
+### Configuration
+
+Set the `SERVER_TOKEN` environment variable or configure it in the YAML file:
+
+```yaml
+server:
+  token: "${SERVER_TOKEN}"
+```
+
+### Usage
+
+#### Default Behavior (No Authentication)
+By default, all endpoints are accessible without authentication:
+
+```bash
+# All endpoints accessible without authentication
+curl http://localhost:80/mcp/healthz
+curl http://localhost:80/mcp/docs
+curl http://localhost:80/mcp/sse
+curl http://localhost:80/mcp/message
+```
+
+#### With Authentication Enabled
+When `SERVER_TOKEN` is set, protected endpoints require authentication:
+
+```bash
+# Protected endpoints (require authentication)
+curl -H "Authorization: Bearer your-server-token" http://localhost:80/mcp/sse
+curl -H "Authorization: Bearer your-server-token" http://localhost:80/mcp/message
+
+# Public endpoints (always accessible)
+curl http://localhost:80/mcp/healthz
+curl http://localhost:80/mcp/docs
+```
+
+### Security Notes
+
+- **Default behavior**: If no `SERVER_TOKEN` is set, authentication is disabled and all requests are allowed
+- **When token is configured**: The token is validated for MCP endpoints that require authentication:
+  - SSE endpoint (`/mcp/sse`)
+  - Message endpoint (`/mcp/message`) 
+  - Main MCP handler (`/mcp`)
+- **Always public endpoints** (never require authentication):
+  - Health check endpoint (`/mcp/healthz`) - for monitoring
+  - Documentation endpoint (`/mcp/docs`) - for API documentation
+- Use strong, randomly generated tokens in production
 
 ## Usage
 

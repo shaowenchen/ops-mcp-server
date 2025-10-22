@@ -5,6 +5,7 @@ server:
   port: 80
   mode: sse
   uri: /mcp
+  token: ""
 
 sops:
   enabled: false
@@ -13,7 +14,7 @@ sops:
     suffix: "-from-ops"
   ops:
     endpoint: "https://ops-server.your-company.com"
-    token: "${SOPS_OPS_TOKEN}"
+    token: ""
 
 events:
   enabled: false
@@ -22,7 +23,7 @@ events:
     suffix: "-from-ops"
   ops:
     endpoint: "https://ops-server.your-company.com"
-    token: "${EVENTS_OPS_TOKEN}"
+    token: ""
 
 metrics:
   enabled: false
@@ -40,8 +41,8 @@ logs:
     suffix: "-from-elasticsearch"
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com"
-    username: "${LOGS_ELASTICSEARCH_USERNAME}"
-    password: "${LOGS_ELASTICSEARCH_PASSWORD}"
+    username: ""
+    password: ""
     timeout: 30
 
 traces:
