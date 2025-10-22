@@ -223,7 +223,11 @@ func (m *Module) handleGetServices(ctx context.Context, request mcp.CallToolRequ
 	if err != nil {
 		return nil, fmt.Errorf("failed to get services: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -308,7 +312,11 @@ func (m *Module) handleGetOperations(ctx context.Context, request mcp.CallToolRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operations: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -407,7 +415,11 @@ func (m *Module) handleGetTrace(ctx context.Context, request mcp.CallToolRequest
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trace: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -545,7 +557,11 @@ func (m *Module) handleFindTraces(ctx context.Context, request mcp.CallToolReque
 	if err != nil {
 		return nil, fmt.Errorf("failed to find traces: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

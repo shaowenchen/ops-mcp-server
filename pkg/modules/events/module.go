@@ -263,7 +263,11 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 		m.logger.Error("Failed to fetch events from API", zap.Error(err))
 		return nil, fmt.Errorf("failed to call events API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		m.logger.Error("API returned non-OK status",
@@ -371,7 +375,11 @@ func (m *Module) handleListEvents(ctx context.Context, request mcp.CallToolReque
 		m.logger.Error("Failed to fetch event types from API", zap.Error(err))
 		return nil, fmt.Errorf("failed to call list events API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		m.logger.Error("List events API returned non-OK status",

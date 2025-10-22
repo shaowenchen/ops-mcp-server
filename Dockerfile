@@ -6,9 +6,17 @@ WORKDIR /builder
 
 COPY . .
 
-RUN go mod tidy
+# Set Go environment variables to skip checksum verification
+ENV GOSUMDB=off
+ENV GONOSUMDB=*
+ENV GOPROXY=direct
+ENV GO111MODULE=on
+
+# Download dependencies first
+RUN go mod download
+
 # Build the application
-RUN GO111MODULE=on CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
 

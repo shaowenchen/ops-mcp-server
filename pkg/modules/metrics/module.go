@@ -153,7 +153,11 @@ func (m *Module) queryPrometheus(ctx context.Context, query string, queryType st
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to query Prometheus: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		m.logger.Error("Prometheus API returned non-200 status",
@@ -271,7 +275,11 @@ func (m *Module) handleListMetrics(ctx context.Context, request mcp.CallToolRequ
 		m.logger.Error("Failed to query metrics list", zap.Error(err))
 		return nil, fmt.Errorf("failed to query metrics list: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		m.logger.Error("Prometheus API returned non-200 status",

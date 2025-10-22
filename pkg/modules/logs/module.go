@@ -213,7 +213,11 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -326,7 +330,11 @@ func (m *Module) handleGetLogStats(ctx context.Context, request mcp.CallToolRequ
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -461,7 +469,11 @@ func (m *Module) handleGetLogServices(ctx context.Context, request mcp.CallToolR
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -561,7 +573,11 @@ func (m *Module) handleGetLogLevels(ctx context.Context, request mcp.CallToolReq
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -714,7 +730,11 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -902,7 +922,11 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1140,7 +1164,11 @@ func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequ
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1284,7 +1312,11 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 			},
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1496,7 +1528,11 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1668,7 +1704,11 @@ func (m *Module) handleElasticsearchSearch(ctx context.Context, request mcp.Call
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1735,7 +1775,11 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1804,7 +1848,11 @@ func (m *Module) handleGetShards(ctx context.Context, request mcp.CallToolReques
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
