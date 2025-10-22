@@ -6,17 +6,13 @@ WORKDIR /builder
 
 COPY . .
 
-# Set Go environment variables to skip checksum verification
-ENV GOSUMDB=off
-ENV GONOSUMDB=*
-ENV GOPROXY=direct
-ENV GO111MODULE=on
+# Set Go environment variables for multi-arch builds
+ENV CGO_ENABLED=0
+ENV GOOS=${TARGETOS:-linux}
+ENV GOARCH=${TARGETARCH}
 
-# Download dependencies first
-RUN go mod download
-
-# Build the application
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o bin/ops-mcp-server cmd/server/main.go
+# Build the application using vendor directory with multi-arch support
+RUN go build -mod=vendor -ldflags="-w -s" -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
 

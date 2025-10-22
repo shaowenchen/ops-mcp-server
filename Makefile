@@ -156,6 +156,13 @@ docker-build:
 	docker build -t $(DOCKER_IMAGE):$(VERSION) .
 	docker tag $(DOCKER_IMAGE):$(VERSION) $(DOCKER_IMAGE):latest
 
+.PHONY: docker-build-multi
+docker-build-multi:
+	@echo "Building multi-architecture Docker images..."
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-t $(DOCKER_IMAGE):latest \
+		.
+
 .PHONY: docker-run
 docker-run-sse:
 	@echo "Running Docker container..."
@@ -204,9 +211,10 @@ help:
 	@echo "  deps-update  - Update dependencies"
 	@echo "  lint         - Lint the code"
 	@echo "  fmt          - Format the code"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run Docker container"
-	@echo "  docker-push  - Push Docker image"
+	@echo "  docker-build      - Build Docker image"
+	@echo "  docker-build-multi - Build multi-architecture Docker images"
+	@echo "  docker-run        - Run Docker container"
+	@echo "  docker-push       - Push Docker image"
 	@echo "  quick        - Quick development cycle (fmt, lint, test, build)"
 	@echo "  dev-setup    - Setup development environment"
 	@echo ""
