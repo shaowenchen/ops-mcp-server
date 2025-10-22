@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -61,11 +62,28 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		timeout = time.Duration(config.Elasticsearch.Timeout) * time.Second
 	}
 
+	// Create HTTP client with proper connection pooling to prevent TIME_WAIT leaks
+	transport := &http.Transport{
+		MaxIdleConns:        100,              // Maximum number of idle connections
+		MaxIdleConnsPerHost: 10,               // Maximum idle connections per host
+		MaxConnsPerHost:     50,               // Maximum connections per host
+		IdleConnTimeout:     90 * time.Second, // How long idle connections are kept
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second, // Connection timeout
+			KeepAlive: 30 * time.Second, // Keep-alive probe interval
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     false, // Enable connection reuse
+		ForceAttemptHTTP2:     false, // Force HTTP/1.1 for better connection reuse
+	}
+
 	m := &Module{
 		config: config,
 		logger: logger.Named("logs"),
 		httpClient: &http.Client{
-			Timeout: timeout,
+			Transport: transport,
+			Timeout:   timeout,
 		},
 	}
 

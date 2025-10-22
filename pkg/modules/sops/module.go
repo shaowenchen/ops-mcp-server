@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -32,12 +33,29 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
 
+	// Create HTTP client with proper connection pooling to prevent TIME_WAIT leaks
+	transport := &http.Transport{
+		MaxIdleConns:        100,              // Maximum number of idle connections
+		MaxIdleConnsPerHost: 10,               // Maximum idle connections per host
+		MaxConnsPerHost:     50,               // Maximum connections per host
+		IdleConnTimeout:     90 * time.Second, // How long idle connections are kept
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second, // Connection timeout
+			KeepAlive: 30 * time.Second, // Keep-alive probe interval
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     false, // Enable connection reuse
+		ForceAttemptHTTP2:     false, // Force HTTP/1.1 for better connection reuse
+	}
+
 	module := &Module{
 		config: config,
 		logger: logger,
 		sops:   make(map[string]*SOPSConfig),
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Transport: transport,
+			Timeout:   30 * time.Second,
 		},
 	}
 
