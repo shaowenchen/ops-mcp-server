@@ -12,7 +12,7 @@ ENV GOOS=${TARGETOS:-linux}
 ENV GOARCH=${TARGETARCH}
 
 # Build the application using vendor directory with multi-arch support
-RUN go build -mod=vendor -ldflags="-w -s" -o bin/ops-mcp-server cmd/server/main.go
+RUN go mod tidy && go mod vendor && go build -mod=vendor -ldflags="-w -s" -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
 
