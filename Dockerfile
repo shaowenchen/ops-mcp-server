@@ -8,7 +8,9 @@ COPY . .
 
 # Set Go environment variables for multi-arch builds
 ENV CGO_ENABLED=0
-ENV GOOS=${TARGETOS:-linux}
+ARG TARGETOS=linux
+ARG TARGETARCH
+ENV GOOS=${TARGETOS}
 ENV GOARCH=${TARGETARCH}
 
 # Build the application using vendor directory with multi-arch support
