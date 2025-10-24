@@ -101,7 +101,7 @@ spec:
               path: /mcp/healthz
               port: 80
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 30  # Increased from 10s to 30s to reduce check frequency
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 3
@@ -110,7 +110,7 @@ spec:
               path: /mcp/healthz
               port: 80
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 15  # Increased from 5s to 15s to reduce check frequency
             timeoutSeconds: 3
             successThreshold: 1
             failureThreshold: 3

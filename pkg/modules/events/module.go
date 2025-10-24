@@ -43,20 +43,23 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		return nil, fmt.Errorf("events config is required")
 	}
 
-	// Create HTTP client with proper connection pooling to prevent TIME_WAIT leaks
+	// Create HTTP client with optimized connection pooling and TIME_WAIT management
 	transport := &http.Transport{
-		MaxIdleConns:        100,              // Maximum number of idle connections
-		MaxIdleConnsPerHost: 10,               // Maximum idle connections per host
-		MaxConnsPerHost:     50,               // Maximum connections per host
-		IdleConnTimeout:     90 * time.Second, // How long idle connections are kept
+		MaxIdleConns:        50,               // Reduce maximum idle connections
+		MaxIdleConnsPerHost: 5,                // Reduce idle connections per host
+		MaxConnsPerHost:     20,               // Reduce maximum connections per host
+		IdleConnTimeout:     30 * time.Second, // Significantly reduce idle connection timeout for faster release
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second, // Connection timeout
-			KeepAlive: 30 * time.Second, // Keep-alive probe interval
+			Timeout:   10 * time.Second, // Reduce connection timeout
+			KeepAlive: 15 * time.Second, // Reduce keep-alive interval
 		}).DialContext,
-		TLSHandshakeTimeout:   10 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second, // Reduce TLS handshake timeout
 		ExpectContinueTimeout: 1 * time.Second,
 		DisableKeepAlives:     false, // Enable connection reuse
 		ForceAttemptHTTP2:     false, // Force HTTP/1.1 for better connection reuse
+		// Add connection cleanup mechanism
+		ResponseHeaderTimeout: 10 * time.Second, // Response header timeout
+		DisableCompression:    false,            // Enable compression to reduce transmission time
 	}
 
 	m := &Module{
@@ -64,7 +67,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		logger: logger.Named("events"),
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   30 * time.Second,
+			Timeout:   15 * time.Second, // Reduce client timeout for faster connection release
 		},
 	}
 

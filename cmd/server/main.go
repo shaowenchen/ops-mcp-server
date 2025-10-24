@@ -614,15 +614,15 @@ func runServer(cmd *cobra.Command, args []string) {
 			json.NewEncoder(w).Encode(healthResponse)
 		})
 
-		// Create custom HTTP server with optimized timeouts for MCP
+		// Create custom HTTP server with optimized timeouts for MCP and TIME_WAIT management
 		httpServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 			Handler: mux,
-			// Optimized timeouts for MCP server
-			ReadTimeout:       60 * time.Second,  // Allow time for MCP message processing
-			WriteTimeout:      60 * time.Second,  // Allow time for MCP response generation
-			IdleTimeout:       300 * time.Second, // 5 minutes for SSE connections
-			ReadHeaderTimeout: 10 * time.Second,  // Quick header validation
+			// Optimized timeouts for MCP server with TIME_WAIT reduction
+			ReadTimeout:       30 * time.Second, // Reduce read timeout for faster connection release
+			WriteTimeout:      30 * time.Second, // Reduce write timeout for faster connection release
+			IdleTimeout:       60 * time.Second, // Reduce idle timeout for faster cleanup of idle connections
+			ReadHeaderTimeout: 5 * time.Second,  // Quick header validation
 		}
 
 		// Create SSE server with dynamic base path

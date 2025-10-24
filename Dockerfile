@@ -41,9 +41,9 @@ USER appuser
 # Expose port
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/healthz || exit 1
+# Health check - Optimize health check frequency and timeout settings
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=2 \
+    CMD wget --no-verbose --tries=1 --spider --timeout=5 http://localhost:80/mcp/healthz || exit 1
 
 # Set environment variables
 ENV OPS_MCP_ENV=production \
