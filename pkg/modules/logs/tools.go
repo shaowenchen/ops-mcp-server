@@ -103,7 +103,7 @@ func (m *Module) buildSearchLogsToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("search_term", mcp.Required(), mcp.Description("Text to search for in log messages")),
-		mcp.WithString("limit", mcp.Description("Maximum number of results to return (default: 50)")),
+		mcp.WithString("size", mcp.Description("Maximum number of results to return (default: 50)")),
 		mcp.WithString("index", mcp.Description("Specific index or index pattern to search (default: * for all indices)")),
 	)
 }
@@ -112,7 +112,7 @@ func (m *Module) buildPodLogsToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("pod", mcp.Required(), mcp.Description("Pod name to query logs for (e.g., polity-v5-55899f979f-xt7rx)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of log entries to return (default: 100)")),
+		mcp.WithString("size", mcp.Description("Maximum number of log entries to return (default: 100)")),
 		mcp.WithString("start_time", mcp.Description("Start time for log filtering (ISO format or relative like '1h', '30m', '7d')")),
 		mcp.WithString("end_time", mcp.Description("End time for log filtering (ISO format or relative like '1h', '30m', '7d')")),
 		mcp.WithString("index", mcp.Description("Specific index or index pattern to search (default: * for all indices)")),
@@ -132,7 +132,7 @@ func (m *Module) buildPathLogsToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("path", mcp.Required(), mcp.Description("Path to query logs for (e.g., /api/v1/users, /health)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of log entries to return (default: 100)")),
+		mcp.WithString("size", mcp.Description("Maximum number of log entries to return (default: 100)")),
 		mcp.WithString("start_time", mcp.Description("Start time for log filtering (ISO format or relative like '1h', '30m', '7d')")),
 		mcp.WithString("end_time", mcp.Description("End time for log filtering (ISO format or relative like '1h', '30m', '7d')")),
 		mcp.WithString("index", mcp.Description("Specific index or index pattern to search (default: * for all indices)")),

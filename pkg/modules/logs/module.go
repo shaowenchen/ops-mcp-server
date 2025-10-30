@@ -126,7 +126,7 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 
 	// Parse parameters
 	var service, level, startTime, endTime string
-	var limit int = 100
+	var size int = 100
 
 	if val, ok := args["service"].(string); ok {
 		service = val
@@ -140,9 +140,9 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 	if val, ok := args["end_time"].(string); ok {
 		endTime = val
 	}
-	if val, ok := args["limit"].(string); ok {
+	if val, ok := args["size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
-			limit = parsed
+			size = parsed
 		}
 	}
 
@@ -216,7 +216,7 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 	// Execute search
 	searchQuery := map[string]interface{}{
 		"query": query,
-		"size":  limit,
+		"size":  size,
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
@@ -281,7 +281,7 @@ func (m *Module) handleQueryLogs(ctx context.Context, request mcp.CallToolReques
 	response := map[string]interface{}{
 		"logs":  searchResult.Hits.Hits,
 		"total": searchResult.Hits.Total.Value,
-		"limit": limit,
+		"size":  size,
 		"filters": map[string]interface{}{
 			"service":    service,
 			"level":      level,
@@ -708,10 +708,10 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		return nil, fmt.Errorf("search_term is required")
 	}
 
-	var limit int = 50
-	if val, ok := args["limit"].(string); ok {
+	var size int = 50
+	if val, ok := args["size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
-			limit = parsed
+			size = parsed
 		}
 	}
 
@@ -730,7 +730,7 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 				"type":   "best_fields",
 			},
 		},
-		"size": limit,
+		"size": size,
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
@@ -817,7 +817,7 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		"search_term":   searchTerm,
 		"results":       results,
 		"total":         searchResult.Hits.Total.Value,
-		"limit":         limit,
+		"size":          size,
 		"index_pattern": indexPattern,
 		"searched_at":   time.Now().Format(time.RFC3339),
 	}
@@ -850,10 +850,10 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 		return nil, fmt.Errorf("pod is required")
 	}
 
-	var limit int = 100
-	if val, ok := args["limit"].(string); ok {
+	var size int = 100
+	if val, ok := args["size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
-			limit = parsed
+			size = parsed
 		}
 	}
 
@@ -876,7 +876,7 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 				},
 			},
 		},
-		"size": limit,
+		"size": size,
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
@@ -1037,7 +1037,7 @@ func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolReque
 		"pod_name":      podName,
 		"results":       results,
 		"total":         searchResult.Hits.Total.Value,
-		"limit":         limit,
+		"size":          size,
 		"index_pattern": indexPattern,
 		"searched_at":   time.Now().Format(time.RFC3339),
 	}
@@ -1070,10 +1070,10 @@ func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequ
 		return nil, fmt.Errorf("path is required")
 	}
 
-	var limit int = 100
-	if val, ok := args["limit"].(string); ok {
+	var size int = 100
+	if val, ok := args["size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
-			limit = parsed
+			size = parsed
 		}
 	}
 
@@ -1096,7 +1096,7 @@ func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequ
 				},
 			},
 		},
-		"size": limit,
+		"size": size,
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
@@ -1251,7 +1251,7 @@ func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequ
 		"path":          path,
 		"results":       results,
 		"total":         searchResult.Hits.Total.Value,
-		"limit":         limit,
+		"size":          size,
 		"index_pattern": indexPattern,
 		"searched_at":   time.Now().Format(time.RFC3339),
 	}
@@ -1275,16 +1275,16 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 	args := request.GetArguments()
 
 	var hours int = 24
-	var limit int = 20
+	var size int = 20
 
 	if val, ok := args["hours"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
 			hours = parsed
 		}
 	}
-	if val, ok := args["limit"].(string); ok {
+	if val, ok := args["size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil {
-			limit = parsed
+			size = parsed
 		}
 	}
 
@@ -1313,7 +1313,7 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 				},
 			},
 		},
-		"size": limit,
+		"size": size,
 		"sort": []map[string]interface{}{
 			{"@timestamp": map[string]interface{}{"order": "desc"}},
 		},
@@ -1398,7 +1398,7 @@ func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallTool
 	response := map[string]interface{}{
 		"errors":       errors,
 		"total":        searchResult.Hits.Total.Value,
-		"limit":        limit,
+		"size":         size,
 		"time_range":   fmt.Sprintf("%dh", hours),
 		"generated_at": time.Now().Format(time.RFC3339),
 	}

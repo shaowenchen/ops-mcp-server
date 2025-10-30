@@ -84,8 +84,8 @@ func (m *Module) buildGetEventsToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("subject_pattern", mcp.Required(), mcp.Description("NATS subject pattern for event querying (supports wildcards * and > for flexible matching)")),
-		mcp.WithString("limit", mcp.Description("Maximum number of events to return (default: 10)")),
-		mcp.WithString("offset", mcp.Description("Number of events to skip (default: 0)")),
+		mcp.WithString("page_size", mcp.Description("Number of events per page (default: 10)")),
+		mcp.WithString("page", mcp.Description("Page number for pagination (default: 1)")),
 		mcp.WithString("start_time", mcp.Description("Start time for filtering events (timestamp, eg, 1758928888000)")),
 	)
 }

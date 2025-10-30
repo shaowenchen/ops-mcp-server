@@ -236,15 +236,15 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 
 	// Build query parameters
 	queryParams := make(map[string]string)
-	if req.Limit > 0 {
-		queryParams["page_size"] = strconv.Itoa(req.Limit)
+	if req.PageSize > 0 {
+		queryParams["page_size"] = strconv.Itoa(req.PageSize)
 	} else {
 		queryParams["page_size"] = "10"
 	}
 
 	page := 1
-	if req.Offset > 0 && req.Limit > 0 {
-		page = (req.Offset / req.Limit) + 1
+	if req.Page > 0 {
+		page = req.Page
 	}
 	queryParams["page"] = strconv.Itoa(page)
 
@@ -275,8 +275,8 @@ func (m *Module) fetchEventsFromAPI(ctx context.Context, req EventsListRequest) 
 		zap.String("resource_type", req.Resource),
 		zap.String("cluster", req.Cluster),
 		zap.String("namespace", req.Namespace),
-		zap.Int("limit", req.Limit),
-		zap.Int("offset", req.Offset),
+		zap.Int("page_size", req.PageSize),
+		zap.Int("page", page),
 		zap.String("start_time", req.StartTime))
 
 	resp, err := m.makeRequestWithFullURL(ctx, "GET", url, nil)
@@ -436,7 +436,7 @@ func (m *Module) handleGetEvents(ctx context.Context, request mcp.CallToolReques
 
 	// Parse parameters for events query
 	var subjectPattern, startTime string
-	var limit, offset int = 10, 0
+	var pageSize, page int = 10, 1
 
 	if val, ok := args["subject_pattern"].(string); ok {
 		subjectPattern = val
@@ -451,21 +451,21 @@ func (m *Module) handleGetEvents(ctx context.Context, request mcp.CallToolReques
 		defaultTime := time.Now().Add(-30 * time.Minute)
 		startTime = strconv.FormatInt(defaultTime.UnixMilli(), 10)
 	}
-	if val, ok := args["limit"].(string); ok {
+	if val, ok := args["page_size"].(string); ok {
 		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
-			limit = parsed
+			pageSize = parsed
 		}
 	}
-	if val, ok := args["offset"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil && parsed >= 0 {
-			offset = parsed
+	if val, ok := args["page"].(string); ok {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			page = parsed
 		}
 	}
 
 	// Create request for events API using subject pattern
 	req := EventsListRequest{
-		Limit:          limit,
-		Offset:         offset,
+		PageSize:       pageSize,
+		Page:           page,
 		SubjectPattern: subjectPattern,
 		StartTime:      startTime,
 	}

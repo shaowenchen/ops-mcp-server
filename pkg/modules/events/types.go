@@ -133,8 +133,8 @@ func ParseSubject(subject string) ParsedEventInfo {
 // EventsListRequest represents a request to list events
 type EventsListRequest struct {
 	StartTime string `json:"startTime,omitempty" yaml:"startTime,omitempty"`
-	Limit     int    `json:"limit,omitempty" yaml:"limit,omitempty"`
-	Offset    int    `json:"offset,omitempty" yaml:"offset,omitempty"`
+	PageSize  int    `json:"page_size,omitempty" yaml:"page_size,omitempty"`
+	Page      int    `json:"page,omitempty" yaml:"page,omitempty"`
 	// Raw subject pattern for direct NATS queries (takes precedence over structured fields)
 	SubjectPattern string `json:"subjectPattern,omitempty" yaml:"subjectPattern,omitempty"`
 	// Kubernetes-specific fields
