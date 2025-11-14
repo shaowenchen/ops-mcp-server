@@ -104,6 +104,8 @@ func (m *Module) buildSearchLogsToolDefinition(config ToolConfig) mcp.Tool {
 		mcp.WithDescription(config.Description),
 		mcp.WithString("search_term", mcp.Required(), mcp.Description("Text to search for in log messages")),
 		mcp.WithString("size", mcp.Description("Maximum number of results to return (default: 50)")),
+		mcp.WithString("start_time", mcp.Description("Start time for log filtering (e.g., '2025-11-14T00:00:00Z' or 'now-1h')")),
+		mcp.WithString("end_time", mcp.Description("End time for log filtering (e.g., '2025-11-14T23:59:59Z' or 'now')")),
 		mcp.WithString("index", mcp.Description("Specific index or index pattern to search (default: * for all indices)")),
 	)
 }

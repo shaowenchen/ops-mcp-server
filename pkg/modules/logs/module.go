@@ -721,20 +721,75 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		indexPattern = val
 	}
 
-	// Build Elasticsearch full-text search query
-	searchQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"multi_match": map[string]interface{}{
-				"query":  searchTerm,
-				"fields": []string{"message", "service", "level", "trace_id", "fields.*"},
-				"type":   "best_fields",
+	// Build Elasticsearch full-text search query with time range support
+	queryClause := map[string]interface{}{
+		"multi_match": map[string]interface{}{
+			"query":  searchTerm,
+			"fields": []string{"message", "service", "level", "trace_id", "fields.*"},
+			"type":   "best_fields",
+		},
+	}
+
+	// Check if time range parameters are provided
+	var startTime, endTime string
+	if val, ok := args["start_time"].(string); ok && val != "" {
+		startTime = val
+	}
+	if val, ok := args["end_time"].(string); ok && val != "" {
+		endTime = val
+	}
+
+	// Log received time parameters
+	m.logger.Info("SearchLogs time parameters",
+		zap.String("start_time", startTime),
+		zap.String("end_time", endTime),
+	)
+
+	// Build query with time range if specified
+	var finalQuery map[string]interface{}
+	if startTime != "" || endTime != "" {
+		// Build time range directly without parsing
+		timeRange := map[string]interface{}{}
+		if startTime != "" {
+			timeRange["gte"] = startTime
+		}
+		if endTime != "" {
+			timeRange["lte"] = endTime
+		}
+
+		// Combine search with time range using bool query
+		finalQuery = map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					queryClause,
+					{
+						"range": map[string]interface{}{
+							"@timestamp": timeRange,
+						},
+					},
+				},
 			},
-		},
-		"size": size,
-		"sort": []map[string]interface{}{
-			{"@timestamp": map[string]interface{}{"order": "desc"}},
-		},
+		}
+
+		// Log the final query structure
+		if queryJSON, err := json.MarshalIndent(finalQuery, "", "  "); err == nil {
+			m.logger.Info("SearchLogs query with time range", zap.String("query", string(queryJSON)))
+		}
+	} else {
+		finalQuery = queryClause
+	}
+
+	searchQuery := map[string]interface{}{
+		"query":   finalQuery,
+		"size":    size,
+		"sort":    []map[string]interface{}{{"@timestamp": map[string]interface{}{"order": "desc"}}},
 		"_source": true,
+	}
+
+	// Log the complete search query
+	if fullQueryJSON, err := json.MarshalIndent(searchQuery, "", "  "); err == nil {
+		m.logger.Info("Complete SearchLogs Elasticsearch query", zap.String("full_query", string(fullQueryJSON)))
+		fmt.Printf("🔍 Complete SearchLogs Query:\n%s\n", string(fullQueryJSON))
 	}
 
 	// Execute search against specified indices
@@ -820,6 +875,18 @@ func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolReque
 		"size":          size,
 		"index_pattern": indexPattern,
 		"searched_at":   time.Now().Format(time.RFC3339),
+	}
+
+	// Add time range info if provided
+	if startTime != "" || endTime != "" {
+		timeRangeInfo := map[string]interface{}{}
+		if startTime != "" {
+			timeRangeInfo["start_time"] = startTime
+		}
+		if endTime != "" {
+			timeRangeInfo["end_time"] = endTime
+		}
+		response["time_range"] = timeRangeInfo
 	}
 
 	data, err := json.Marshal(response)

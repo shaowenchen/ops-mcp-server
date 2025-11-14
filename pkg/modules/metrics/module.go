@@ -443,7 +443,7 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 	}
 
 	// Get step parameter or use default
-	step := "60s"
+	step := "15s"
 	if stepArg, ok := args["step"].(string); ok && stepArg != "" {
 		step = stepArg
 	}
@@ -453,19 +453,13 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 		zap.String("time_range", timeRange),
 		zap.String("step", step))
 
-	// Parse time range
-	var duration time.Duration
-	switch timeRange {
-	case "1h":
-		duration = time.Hour
-	case "24h":
-		duration = 24 * time.Hour
-	case "7d":
-		duration = 7 * 24 * time.Hour
-	case "30d":
-		duration = 30 * 24 * time.Hour
-	default:
-		return nil, fmt.Errorf("unsupported time range: %s (supported: 1h, 24h, 7d, 30d)", timeRange)
+	// Parse time range dynamically
+	duration, err := parseTimeRange(timeRange)
+	if err != nil {
+		m.logger.Error("Failed to parse time_range",
+			zap.String("time_range", timeRange),
+			zap.Error(err))
+		return nil, fmt.Errorf("invalid time_range format '%s': %w (supported units: s, m, h, d - examples: 5m, 10m, 1h, 24h, 7d)", timeRange, err)
 	}
 
 	now := time.Now()
@@ -520,4 +514,31 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 			},
 		},
 	}, nil
+}
+
+// parseTimeRange parses a time range string supporting s, m, h, d units
+// Examples: "5m", "10m", "1h", "24h", "7d", "30d"
+func parseTimeRange(timeRange string) (time.Duration, error) {
+	if timeRange == "" {
+		return 0, fmt.Errorf("time range cannot be empty")
+	}
+
+	// Check if it ends with 'd' for days
+	if strings.HasSuffix(timeRange, "d") {
+		// Extract the number part
+		numStr := strings.TrimSuffix(timeRange, "d")
+		days, err := strconv.ParseFloat(numStr, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid day value: %w", err)
+		}
+		return time.Duration(days * 24 * float64(time.Hour)), nil
+	}
+
+	// For s, m, h units, use time.ParseDuration
+	duration, err := time.ParseDuration(timeRange)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration format: %w", err)
+	}
+
+	return duration, nil
 }
