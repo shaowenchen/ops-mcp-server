@@ -20,10 +20,10 @@ import (
 
 // PrometheusConfig contains Prometheus configuration
 type PrometheusConfig struct {
-	Endpoint    string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
-	Username    string `mapstructure:"username" json:"username" yaml:"username"`
-	Password    string `mapstructure:"password" json:"password" yaml:"password"`
-	BearerToken string `mapstructure:"bearer_token" json:"bearer_token" yaml:"bearer_token"`
+	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Username string `mapstructure:"username" json:"username" yaml:"username"`
+	Password string `mapstructure:"password" json:"password" yaml:"password"`
+	Token    string `mapstructure:"token" json:"token" yaml:"token"`
 }
 
 // ToolsConfig contains tools configuration
@@ -127,8 +127,8 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 
 	// Set authentication
 	authMethod := "none"
-	if m.config.Prometheus.BearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+m.config.Prometheus.BearerToken)
+	if m.config.Prometheus.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+m.config.Prometheus.Token)
 		authMethod = "bearer_token"
 	} else if m.config.Prometheus.Username != "" && m.config.Prometheus.Password != "" {
 		req.SetBasicAuth(m.config.Prometheus.Username, m.config.Prometheus.Password)

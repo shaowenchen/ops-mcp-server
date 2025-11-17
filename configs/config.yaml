@@ -32,10 +32,10 @@ metrics:
     suffix: "-from-prometheus"
   prometheus:
     endpoint: "https://prometheus.your-company.com"
-    # Authentication (priority: bearer_token > basic auth > none)
+    # Authentication (priority: token > basic auth > none)
     username: ""       # Optional: Basic auth username
     password: ""       # Optional: Basic auth password
-    bearer_token: ""   # Optional: Bearer token
+    token: ""          # Optional: Bearer token
     timeout: 30
 
 logs:

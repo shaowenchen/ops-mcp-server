@@ -193,7 +193,7 @@ func initConfig() {
 	viper.BindEnv("metrics.prometheus.endpoint", "METRICS_PROMETHEUS_ENDPOINT")
 	viper.BindEnv("metrics.prometheus.username", "METRICS_PROMETHEUS_USERNAME")
 	viper.BindEnv("metrics.prometheus.password", "METRICS_PROMETHEUS_PASSWORD")
-	viper.BindEnv("metrics.prometheus.bearer_token", "METRICS_PROMETHEUS_BEARER_TOKEN")
+	viper.BindEnv("metrics.prometheus.token", "METRICS_PROMETHEUS_TOKEN")
 	viper.BindEnv("logs.elasticsearch.endpoint", "LOGS_ELASTICSEARCH_ENDPOINT")
 	viper.BindEnv("logs.elasticsearch.username", "LOGS_ELASTICSEARCH_USERNAME")
 	viper.BindEnv("logs.elasticsearch.password", "LOGS_ELASTICSEARCH_PASSWORD")

@@ -87,10 +87,10 @@ metrics:
     suffix: "-from-prometheus"
   prometheus:
     endpoint: "https://prometheus.your-company.com"
-    # Authentication (priority: bearer_token > basic auth > none)
+    # Authentication (priority: token > basic auth > none)
     username: "${METRICS_PROMETHEUS_USERNAME}"      # Optional
     password: "${METRICS_PROMETHEUS_PASSWORD}"      # Optional
-    bearer_token: "${METRICS_PROMETHEUS_BEARER_TOKEN}"  # Optional
+    token: "${METRICS_PROMETHEUS_TOKEN}"            # Optional
     timeout: 30
 
 logs:
@@ -132,11 +132,11 @@ export SOPS_OPS_TOKEN="your-token"
 export EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com"
 export EVENTS_OPS_TOKEN="your-token"
 
-# Prometheus authentication (optional, priority: bearer_token > basic auth)
+# Prometheus authentication (optional, priority: token > basic auth)
 export METRICS_PROMETHEUS_ENDPOINT="https://prometheus.your-company.com"
 export METRICS_PROMETHEUS_USERNAME="your-username"        # Optional: Basic auth
 export METRICS_PROMETHEUS_PASSWORD="your-password"        # Optional: Basic auth
-export METRICS_PROMETHEUS_BEARER_TOKEN="your-token"       # Optional: Bearer token
+export METRICS_PROMETHEUS_TOKEN="your-token"              # Optional: Bearer token
 
 # Elasticsearch authentication (optional, priority: api_key > basic auth)
 export LOGS_ELASTICSEARCH_ENDPOINT="https://elasticsearch.your-company.com"
@@ -160,7 +160,7 @@ The server supports multiple authentication methods for connecting to backend se
 
 #### Prometheus Authentication
 Supports two authentication methods with the following priority:
-1. **Bearer Token** (highest priority) - Set `bearer_token` or `METRICS_PROMETHEUS_BEARER_TOKEN`
+1. **Bearer Token** (highest priority) - Set `token` or `METRICS_PROMETHEUS_TOKEN`
 2. **Basic Auth** - Set both `username`/`password` or `METRICS_PROMETHEUS_USERNAME`/`METRICS_PROMETHEUS_PASSWORD`
 3. **No Authentication** (default) - If none of the above are configured
 
