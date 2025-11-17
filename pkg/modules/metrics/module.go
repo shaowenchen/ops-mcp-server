@@ -20,7 +20,10 @@ import (
 
 // PrometheusConfig contains Prometheus configuration
 type PrometheusConfig struct {
-	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Endpoint    string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Username    string `mapstructure:"username" json:"username" yaml:"username"`
+	Password    string `mapstructure:"password" json:"password" yaml:"password"`
+	BearerToken string `mapstructure:"bearer_token" json:"bearer_token" yaml:"bearer_token"`
 }
 
 // ToolsConfig contains tools configuration
@@ -122,6 +125,16 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
+	// Set authentication
+	authMethod := "none"
+	if m.config.Prometheus.BearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+m.config.Prometheus.BearerToken)
+		authMethod = "bearer_token"
+	} else if m.config.Prometheus.Username != "" && m.config.Prometheus.Password != "" {
+		req.SetBasicAuth(m.config.Prometheus.Username, m.config.Prometheus.Password)
+		authMethod = "basic_auth"
+	}
+
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		m.logger.Error("Prometheus Request Failed",
@@ -137,6 +150,7 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 		zap.String("url", url),
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("status", resp.Status),
+		zap.String("auth_method", authMethod),
 		zap.Int64("content_length", resp.ContentLength))
 
 	return resp, nil

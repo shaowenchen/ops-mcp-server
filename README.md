@@ -36,9 +36,9 @@ Ops MCP Server enables AI assistants to query and interact with your observabili
 - `query-metrics-range-from-prometheus` - Execute range queries
 
 ### Logs Module
-- `search-logs-from-elasticsearch` - Search logs
-- `list-log-indices-from-elasticsearch` - List log indices
-- `get-pod-logs-from-elasticsearch` - Get pod logs
+- `search-logs-from-elasticsearch` - Full-text search across log messages
+- `list-log-indices-from-elasticsearch` - List all available log indices
+- `query-logs-from-elasticsearch` - Query logs using ES|QL (Elasticsearch Query Language)
 
 ### Traces Module
 - `get-services-from-jaeger` - List services
@@ -87,6 +87,10 @@ metrics:
     suffix: "-from-prometheus"
   prometheus:
     endpoint: "https://prometheus.your-company.com"
+    # Authentication (priority: bearer_token > basic auth > none)
+    username: "${METRICS_PROMETHEUS_USERNAME}"      # Optional
+    password: "${METRICS_PROMETHEUS_PASSWORD}"      # Optional
+    bearer_token: "${METRICS_PROMETHEUS_BEARER_TOKEN}"  # Optional
     timeout: 30
 
 logs:
@@ -96,8 +100,10 @@ logs:
     suffix: "-from-elasticsearch"
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com"
-    username: "${LOGS_ELASTICSEARCH_USERNAME}"
-    password: "${LOGS_ELASTICSEARCH_PASSWORD}"
+    # Authentication (priority: api_key > basic auth > none)
+    username: "${LOGS_ELASTICSEARCH_USERNAME}"    # Optional
+    password: "${LOGS_ELASTICSEARCH_PASSWORD}"    # Optional
+    api_key: "${LOGS_ELASTICSEARCH_API_KEY}"      # Optional
     timeout: 30
 
 traces:
@@ -125,17 +131,46 @@ export SOPS_OPS_ENDPOINT="https://ops-server.your-company.com"
 export SOPS_OPS_TOKEN="your-token"
 export EVENTS_OPS_ENDPOINT="https://ops-server.your-company.com"
 export EVENTS_OPS_TOKEN="your-token"
-export LOGS_ELASTICSEARCH_USERNAME="elastic"
-export LOGS_ELASTICSEARCH_PASSWORD="your-password"
+
+# Prometheus authentication (optional, priority: bearer_token > basic auth)
+export METRICS_PROMETHEUS_ENDPOINT="https://prometheus.your-company.com"
+export METRICS_PROMETHEUS_USERNAME="your-username"        # Optional: Basic auth
+export METRICS_PROMETHEUS_PASSWORD="your-password"        # Optional: Basic auth
+export METRICS_PROMETHEUS_BEARER_TOKEN="your-token"       # Optional: Bearer token
+
+# Elasticsearch authentication (optional, priority: api_key > basic auth)
+export LOGS_ELASTICSEARCH_ENDPOINT="https://elasticsearch.your-company.com"
+export LOGS_ELASTICSEARCH_USERNAME="elastic"              # Optional: Basic auth
+export LOGS_ELASTICSEARCH_PASSWORD="your-password"        # Optional: Basic auth
+export LOGS_ELASTICSEARCH_API_KEY="your-api-key"          # Optional: API key
+
 export TRACES_JAEGER_ENDPOINT="https://jaeger.your-company.com"
 # export SERVER_TOKEN="your-server-token"  # Optional: Uncomment to enable authentication
 ```
 
 ## Authentication
 
+### MCP Server Authentication
+
 The MCP server supports optional token-based authentication. By default, no authentication is required. When a `token` is configured in the server configuration, protected endpoints will require a valid `Authorization` header with a Bearer token.
 
-### Configuration
+### Backend Service Authentication
+
+The server supports multiple authentication methods for connecting to backend services:
+
+#### Prometheus Authentication
+Supports two authentication methods with the following priority:
+1. **Bearer Token** (highest priority) - Set `bearer_token` or `METRICS_PROMETHEUS_BEARER_TOKEN`
+2. **Basic Auth** - Set both `username`/`password` or `METRICS_PROMETHEUS_USERNAME`/`METRICS_PROMETHEUS_PASSWORD`
+3. **No Authentication** (default) - If none of the above are configured
+
+#### Elasticsearch Authentication
+Supports two authentication methods with the following priority:
+1. **API Key** (highest priority) - Set `api_key` or `LOGS_ELASTICSEARCH_API_KEY`
+2. **Basic Auth** - Set both `username`/`password` or `LOGS_ELASTICSEARCH_USERNAME`/`LOGS_ELASTICSEARCH_PASSWORD`
+3. **No Authentication** (default) - If none of the above are configured
+
+### MCP Server Token Configuration
 
 Set the `SERVER_TOKEN` environment variable or configure it in the YAML file:
 

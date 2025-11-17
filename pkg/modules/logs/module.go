@@ -38,7 +38,7 @@ type ElasticsearchConfig struct {
 	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
 	Username string `mapstructure:"username" json:"username" yaml:"username"`
 	Password string `mapstructure:"password" json:"password" yaml:"password"`
-	APIKey   string `mapstructure:"apikey" json:"apikey" yaml:"apikey"`
+	APIKey   string `mapstructure:"api_key" json:"api_key" yaml:"api_key"`
 	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 
@@ -695,649 +695,6 @@ func (m *Module) handleGetLogLevels(ctx context.Context, request mcp.CallToolReq
 	}, nil
 }
 
-func (m *Module) handleSearchLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Check if Elasticsearch is configured
-	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
-		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
-	}
-
-	args := request.GetArguments()
-
-	searchTerm, ok := args["search_term"].(string)
-	if !ok {
-		return nil, fmt.Errorf("search_term is required")
-	}
-
-	var size int = 50
-	if val, ok := args["size"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			size = parsed
-		}
-	}
-
-	// Get index pattern - default to all indices if not specified
-	indexPattern := "*"
-	if val, ok := args["index"].(string); ok && val != "" {
-		indexPattern = val
-	}
-
-	// Build Elasticsearch full-text search query with time range support
-	queryClause := map[string]interface{}{
-		"multi_match": map[string]interface{}{
-			"query":  searchTerm,
-			"fields": []string{"message", "service", "level", "trace_id", "fields.*"},
-			"type":   "best_fields",
-		},
-	}
-
-	// Check if time range parameters are provided
-	var startTime, endTime string
-	if val, ok := args["start_time"].(string); ok && val != "" {
-		startTime = val
-	}
-	if val, ok := args["end_time"].(string); ok && val != "" {
-		endTime = val
-	}
-
-	// Log received time parameters
-	m.logger.Info("SearchLogs time parameters",
-		zap.String("start_time", startTime),
-		zap.String("end_time", endTime),
-	)
-
-	// Build query with time range if specified
-	var finalQuery map[string]interface{}
-	if startTime != "" || endTime != "" {
-		// Build time range directly without parsing
-		timeRange := map[string]interface{}{}
-		if startTime != "" {
-			timeRange["gte"] = startTime
-		}
-		if endTime != "" {
-			timeRange["lte"] = endTime
-		}
-
-		// Combine search with time range using bool query
-		finalQuery = map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					queryClause,
-					{
-						"range": map[string]interface{}{
-							"@timestamp": timeRange,
-						},
-					},
-				},
-			},
-		}
-
-		// Log the final query structure
-		if queryJSON, err := json.MarshalIndent(finalQuery, "", "  "); err == nil {
-			m.logger.Info("SearchLogs query with time range", zap.String("query", string(queryJSON)))
-		}
-	} else {
-		finalQuery = queryClause
-	}
-
-	searchQuery := map[string]interface{}{
-		"query":   finalQuery,
-		"size":    size,
-		"sort":    []map[string]interface{}{{"@timestamp": map[string]interface{}{"order": "desc"}}},
-		"_source": true,
-	}
-
-	// Log the complete search query
-	if fullQueryJSON, err := json.MarshalIndent(searchQuery, "", "  "); err == nil {
-		m.logger.Info("Complete SearchLogs Elasticsearch query", zap.String("full_query", string(fullQueryJSON)))
-		fmt.Printf("🔍 Complete SearchLogs Query:\n%s\n", string(fullQueryJSON))
-	}
-
-	// Execute search against specified indices
-	searchPath := indexPattern + "/_search"
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, searchQuery)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to search Elasticsearch: %v", err),
-				},
-			},
-		}, nil
-	}
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to read response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	if resp.StatusCode != 200 {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(body)),
-				},
-			},
-		}, nil
-	}
-
-	var searchResult ElasticsearchSearchResponse
-	if err := json.Unmarshal(body, &searchResult); err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to parse response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	// Convert Elasticsearch hits to structured format with all fields
-	var results []map[string]interface{}
-	for _, hit := range searchResult.Hits.Hits {
-		logEntry := map[string]interface{}{
-			"id": hit.ID,
-		}
-
-		// Include all fields from _source
-		if source := hit.Source; source != nil {
-			// Add all source fields to the log entry
-			for key, value := range source {
-				logEntry[key] = value
-			}
-		}
-
-		results = append(results, logEntry)
-	}
-
-	response := map[string]interface{}{
-		"search_term":   searchTerm,
-		"results":       results,
-		"total":         searchResult.Hits.Total.Value,
-		"size":          size,
-		"index_pattern": indexPattern,
-		"searched_at":   time.Now().Format(time.RFC3339),
-	}
-
-	// Add time range info if provided
-	if startTime != "" || endTime != "" {
-		timeRangeInfo := map[string]interface{}{}
-		if startTime != "" {
-			timeRangeInfo["start_time"] = startTime
-		}
-		if endTime != "" {
-			timeRangeInfo["end_time"] = endTime
-		}
-		response["time_range"] = timeRangeInfo
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func (m *Module) handleGetPodLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Check if Elasticsearch is configured
-	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
-		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
-	}
-
-	args := request.GetArguments()
-
-	podName, ok := args["pod"].(string)
-	if !ok {
-		return nil, fmt.Errorf("pod is required")
-	}
-
-	var size int = 100
-	if val, ok := args["size"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			size = parsed
-		}
-	}
-
-	// Get index pattern - default to filebeat and logs indices if not specified
-	indexPattern := "*"
-	if val, ok := args["index"].(string); ok && val != "" {
-		indexPattern = val
-	}
-
-	// Build Elasticsearch query for specific pod logs - Fixed field names
-	podQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"match": map[string]interface{}{
-							"k8s.pod": podName,
-						},
-					},
-				},
-			},
-		},
-		"size": size,
-		"sort": []map[string]interface{}{
-			{"@timestamp": map[string]interface{}{"order": "desc"}},
-		},
-		"_source": true,
-	}
-
-	// Add time range filter if specified
-	mustClauses := podQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
-
-	if startTime, ok := args["start_time"].(string); ok && startTime != "" {
-		// Parse start time to handle relative formats like "1h", "30m", etc.
-		parsedStartTime, err := parseTimeInput(startTime)
-		if err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{
-					mcp.TextContent{
-						Type: "text",
-						Text: fmt.Sprintf("Invalid start_time format: %v", err),
-					},
-				},
-			}, nil
-		}
-
-		timeFilter := map[string]interface{}{
-			"range": map[string]interface{}{
-				"@timestamp": map[string]interface{}{
-					"gte": parsedStartTime,
-				},
-			},
-		}
-
-		if endTime, ok := args["end_time"].(string); ok && endTime != "" {
-			// Parse end time as well
-			parsedEndTime, err := parseTimeInput(endTime)
-			if err != nil {
-				return &mcp.CallToolResult{
-					IsError: true,
-					Content: []mcp.Content{
-						mcp.TextContent{
-							Type: "text",
-							Text: fmt.Sprintf("Invalid end_time format: %v", err),
-						},
-					},
-				}, nil
-			}
-			timeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = parsedEndTime
-		}
-		mustClauses = append(mustClauses, timeFilter)
-		podQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = mustClauses
-	}
-
-	// Execute search against specified indices
-	searchPath := indexPattern + "/_search"
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, podQuery)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to search Elasticsearch for pod logs: %v", err),
-				},
-			},
-		}, nil
-	}
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to read response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	if resp.StatusCode != 200 {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(body)),
-				},
-			},
-		}, nil
-	}
-
-	var searchResult ElasticsearchSearchResponse
-	if err := json.Unmarshal(body, &searchResult); err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to parse response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	// Convert Elasticsearch hits to structured log format - Fixed field extraction
-	var results []map[string]interface{}
-	for _, hit := range searchResult.Hits.Hits {
-		logEntry := map[string]interface{}{
-			"id": hit.ID,
-		}
-
-		// Extract fields from _source
-		if source := hit.Source; source != nil {
-			if timestamp, ok := source["@timestamp"].(string); ok {
-				logEntry["timestamp"] = timestamp
-			}
-			if level, ok := source["level"].(string); ok {
-				logEntry["level"] = level
-			}
-			if message, ok := source["message"].(string); ok {
-				logEntry["message"] = message
-			}
-			if log, ok := source["log"].(string); ok {
-				logEntry["log"] = log
-			}
-			if stream, ok := source["stream"].(string); ok {
-				logEntry["stream"] = stream
-			}
-
-			// Extract K8s metadata using correct field names
-			if podName, ok := source["k8s.pod"].(string); ok {
-				logEntry["pod_name"] = podName
-			}
-			if namespace, ok := source["k8s.namespace"].(string); ok {
-				logEntry["namespace"] = namespace
-			}
-			if container, ok := source["k8s.container"].(string); ok {
-				logEntry["container"] = container
-			}
-			if node, ok := source["k8s.node"].(string); ok {
-				logEntry["node"] = node
-			}
-			if fields, ok := source["fields"].(map[string]interface{}); ok {
-				logEntry["fields"] = fields
-			}
-		}
-
-		results = append(results, logEntry)
-	}
-
-	response := map[string]interface{}{
-		"pod_name":      podName,
-		"results":       results,
-		"total":         searchResult.Hits.Total.Value,
-		"size":          size,
-		"index_pattern": indexPattern,
-		"searched_at":   time.Now().Format(time.RFC3339),
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
-func (m *Module) handleGetPathLogs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Check if Elasticsearch is configured
-	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
-		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
-	}
-
-	args := request.GetArguments()
-
-	path, ok := args["path"].(string)
-	if !ok {
-		return nil, fmt.Errorf("path is required")
-	}
-
-	var size int = 100
-	if val, ok := args["size"].(string); ok {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			size = parsed
-		}
-	}
-
-	// Get index pattern - default to all indices if not specified
-	indexPattern := "*"
-	if val, ok := args["index"].(string); ok && val != "" {
-		indexPattern = val
-	}
-
-	// Build Elasticsearch query for specific path logs
-	pathQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"match": map[string]interface{}{
-							"path": path,
-						},
-					},
-				},
-			},
-		},
-		"size": size,
-		"sort": []map[string]interface{}{
-			{"@timestamp": map[string]interface{}{"order": "desc"}},
-		},
-		"_source": true,
-	}
-
-	// Add HTTP method filter if specified
-	mustClauses := pathQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
-
-	if method, ok := args["method"].(string); ok && method != "" {
-		methodFilter := map[string]interface{}{
-			"match": map[string]interface{}{
-				"request.method": strings.ToUpper(method),
-			},
-		}
-		mustClauses = append(mustClauses, methodFilter)
-	}
-
-	// Add status code filter if specified
-	if statusCode, ok := args["status_code"].(string); ok && statusCode != "" {
-		statusFilter := map[string]interface{}{
-			"match": map[string]interface{}{
-				"response.status_code": statusCode,
-			},
-		}
-		mustClauses = append(mustClauses, statusFilter)
-	}
-
-	// Add time range filter if specified
-	if startTime, ok := args["start_time"].(string); ok && startTime != "" {
-		// Parse start time to handle relative formats like "1h", "30m", etc.
-		parsedStartTime, err := parseTimeInput(startTime)
-		if err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{
-					mcp.TextContent{
-						Type: "text",
-						Text: fmt.Sprintf("Invalid start_time format: %v", err),
-					},
-				},
-			}, nil
-		}
-
-		timeFilter := map[string]interface{}{
-			"range": map[string]interface{}{
-				"@timestamp": map[string]interface{}{
-					"gte": parsedStartTime,
-				},
-			},
-		}
-
-		if endTime, ok := args["end_time"].(string); ok && endTime != "" {
-			// Parse end time as well
-			parsedEndTime, err := parseTimeInput(endTime)
-			if err != nil {
-				return &mcp.CallToolResult{
-					IsError: true,
-					Content: []mcp.Content{
-						mcp.TextContent{
-							Type: "text",
-							Text: fmt.Sprintf("Invalid end_time format: %v", err),
-						},
-					},
-				}, nil
-			}
-			timeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = parsedEndTime
-		}
-		mustClauses = append(mustClauses, timeFilter)
-	}
-
-	// Update the must clauses
-	pathQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = mustClauses
-
-	// Execute search against specified indices
-	searchPath := indexPattern + "/_search"
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", searchPath, pathQuery)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to search Elasticsearch for path logs: %v", err),
-				},
-			},
-		}, nil
-	}
-	defer func() {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to read response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	if resp.StatusCode != 200 {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(body)),
-				},
-			},
-		}, nil
-	}
-
-	var searchResult ElasticsearchSearchResponse
-	if err := json.Unmarshal(body, &searchResult); err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf("Failed to parse response: %v", err),
-				},
-			},
-		}, nil
-	}
-
-	// Convert Elasticsearch hits to structured log format
-	var results []map[string]interface{}
-	for _, hit := range searchResult.Hits.Hits {
-		logEntry := map[string]interface{}{
-			"id": hit.ID,
-		}
-
-		// Include all fields from _source
-		if source := hit.Source; source != nil {
-			// Add all source fields to the log entry
-			for key, value := range source {
-				logEntry[key] = value
-			}
-		}
-
-		results = append(results, logEntry)
-	}
-
-	response := map[string]interface{}{
-		"path":          path,
-		"results":       results,
-		"total":         searchResult.Hits.Total.Value,
-		"size":          size,
-		"index_pattern": indexPattern,
-		"searched_at":   time.Now().Format(time.RFC3339),
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(data),
-			},
-		},
-	}, nil
-}
-
 func (m *Module) handleGetRecentErrors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
 
@@ -1735,6 +1092,11 @@ func (m *Module) handleGetMappings(ctx context.Context, request mcp.CallToolRequ
 }
 
 func (m *Module) handleElasticsearchSearch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if Elasticsearch is configured
+	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
+		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+	}
+
 	args := request.GetArguments()
 
 	indexName, ok := args["index"].(string)
@@ -1742,55 +1104,37 @@ func (m *Module) handleElasticsearchSearch(ctx context.Context, request mcp.Call
 		return nil, fmt.Errorf("index parameter is required")
 	}
 
-	queryStr, ok := args["query"].(string)
-	if !ok || queryStr == "" {
-		return nil, fmt.Errorf("query parameter is required")
+	bodyStr, ok := args["body"].(string)
+	if !ok || bodyStr == "" {
+		return nil, fmt.Errorf("body parameter is required")
 	}
 
-	// Parse query JSON
-	var query map[string]interface{}
-	if err := json.Unmarshal([]byte(queryStr), &query); err != nil {
-		return nil, fmt.Errorf("invalid query JSON: %w", err)
+	// Parse the complete ES query body
+	var searchRequest map[string]interface{}
+	if err := json.Unmarshal([]byte(bodyStr), &searchRequest); err != nil {
+		return nil, fmt.Errorf("invalid query body JSON: %w", err)
 	}
 
-	// Build search request
-	searchRequest := map[string]interface{}{
-		"query": query,
+	// Log the query for debugging
+	if queryJSON, err := json.MarshalIndent(searchRequest, "", "  "); err == nil {
+		m.logger.Info("Elasticsearch native query",
+			zap.String("index", indexName),
+			zap.String("query", string(queryJSON)))
 	}
 
-	// Add optional parameters
-	if sizeStr, ok := args["size"].(string); ok && sizeStr != "" {
-		if size, err := strconv.Atoi(sizeStr); err == nil && size > 0 && size <= 10000 {
-			searchRequest["size"] = size
-		}
-	} else {
-		searchRequest["size"] = 10 // default
-	}
-
-	if fromStr, ok := args["from"].(string); ok && fromStr != "" {
-		if from, err := strconv.Atoi(fromStr); err == nil && from >= 0 {
-			searchRequest["from"] = from
-		}
-	}
-
-	if sortStr, ok := args["sort"].(string); ok && sortStr != "" {
-		var sort interface{}
-		if err := json.Unmarshal([]byte(sortStr), &sort); err == nil {
-			searchRequest["sort"] = sort
-		}
-	}
-
-	if sourceStr, ok := args["_source"].(string); ok && sourceStr != "" {
-		var source interface{}
-		if err := json.Unmarshal([]byte(sourceStr), &source); err == nil {
-			searchRequest["_source"] = source
-		}
-	}
-
+	// Execute the native ES search request
 	path := fmt.Sprintf("%s/_search", indexName)
 	resp, err := m.makeElasticsearchRequest(ctx, "POST", path, searchRequest)
 	if err != nil {
-		return nil, err
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to execute Elasticsearch query: %v", err),
+				},
+			},
+		}, nil
 	}
 	defer func() {
 		if resp != nil && resp.Body != nil {
@@ -1800,29 +1144,35 @@ func (m *Module) handleElasticsearchSearch(ctx context.Context, request mcp.Call
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to read response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("elasticsearch search error (%d): %s", resp.StatusCode, string(responseData))
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(responseData)),
+				},
+			},
+		}, nil
 	}
 
-	// Parse and return the search response
-	var searchResponse ElasticsearchSearchResponse
-	if err := json.Unmarshal(responseData, &searchResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse search response: %w", err)
-	}
-
-	data, err := json.Marshal(searchResponse)
-	if err != nil {
-		return nil, err
-	}
-
+	// Return the raw ES response
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{
 				Type: "text",
-				Text: string(data),
+				Text: string(responseData),
 			},
 		},
 	}, nil
@@ -1859,7 +1209,7 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 		esqlRequest["columnar"] = true
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "POST", "_query", esqlRequest)
+	resp, err := m.makeElasticsearchRequest(ctx, "GET", "_query", esqlRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -1885,7 +1235,25 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 		if err := json.Unmarshal(responseData, &esqlResponse); err != nil {
 			return nil, fmt.Errorf("failed to parse ES|QL response: %w", err)
 		}
-		result = esqlResponse
+
+		// Transform response into an array of objects (like Rust implementation)
+		// This makes the response much more user-friendly
+		objects := make([]map[string]interface{}, 0, len(esqlResponse.Values))
+		for _, row := range esqlResponse.Values {
+			obj := make(map[string]interface{})
+			for i, value := range row {
+				if i < len(esqlResponse.Columns) {
+					obj[esqlResponse.Columns[i].Name] = value
+				}
+			}
+			objects = append(objects, obj)
+		}
+
+		result = map[string]interface{}{
+			"columns": esqlResponse.Columns,
+			"data":    objects,
+			"meta":    esqlResponse.Meta,
+		}
 	} else {
 		result = string(responseData)
 	}

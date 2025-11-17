@@ -32,6 +32,10 @@ metrics:
     suffix: "-from-prometheus"
   prometheus:
     endpoint: "https://prometheus.your-company.com"
+    # Authentication (priority: bearer_token > basic auth > none)
+    username: ""       # Optional: Basic auth username
+    password: ""       # Optional: Basic auth password
+    bearer_token: ""   # Optional: Bearer token
     timeout: 30
 
 logs:
@@ -41,8 +45,10 @@ logs:
     suffix: "-from-elasticsearch"
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com"
-    username: ""
-    password: ""
+    # Authentication (priority: api_key > basic auth > none)
+    username: ""    # Optional: Basic auth username
+    password: ""    # Optional: Basic auth password
+    api_key: ""     # Optional: Elasticsearch API key
     timeout: 30
 
 traces:
