@@ -51,6 +51,9 @@ type EventsConfig struct {
 // PrometheusConfig contains Prometheus configuration for metrics
 type PrometheusConfig struct {
 	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
+	Username string `mapstructure:"username" json:"username" yaml:"username"`
+	Password string `mapstructure:"password" json:"password" yaml:"password"`
+	Token    string `mapstructure:"token" json:"token" yaml:"token"`
 	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 
@@ -73,7 +76,7 @@ type LogsElasticsearchConfig struct {
 	Endpoint string `mapstructure:"endpoint" json:"endpoint" yaml:"endpoint"`
 	Username string `mapstructure:"username" json:"username" yaml:"username"`
 	Password string `mapstructure:"password" json:"password" yaml:"password"`
-	APIKey   string `mapstructure:"apikey" json:"apikey" yaml:"apikey"`
+	APIKey   string `mapstructure:"api_key" json:"api_key" yaml:"api_key"`
 	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 

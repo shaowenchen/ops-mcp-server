@@ -33,9 +33,10 @@ metrics:
   prometheus:
     endpoint: "https://prometheus.your-company.com"
     # Authentication (priority: token > basic auth > none)
-    username: ""       # Optional: Basic auth username
-    password: ""       # Optional: Basic auth password
-    token: ""          # Optional: Bearer token
+    # Set via environment variables: METRICS_PROMETHEUS_USERNAME, METRICS_PROMETHEUS_PASSWORD, METRICS_PROMETHEUS_TOKEN
+    username: ""    # Optional: Basic auth username
+    password: ""    # Optional: Basic auth password
+    token: ""       # Optional: Bearer token
     timeout: 30
 
 logs:
@@ -46,6 +47,7 @@ logs:
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com"
     # Authentication (priority: api_key > basic auth > none)
+    # Set via environment variables: LOGS_ELASTICSEARCH_USERNAME, LOGS_ELASTICSEARCH_PASSWORD, LOGS_ELASTICSEARCH_API_KEY
     username: ""    # Optional: Basic auth username
     password: ""    # Optional: Basic auth password
     api_key: ""     # Optional: Elasticsearch API key

@@ -59,7 +59,7 @@ server:
   port: 80
   mode: sse
   uri: /mcp
-  # token: "${SERVER_TOKEN}"  # Optional: Uncomment to enable authentication
+  token: ""  # Optional: Set via SERVER_TOKEN environment variable
 
 # Enable modules
 sops:
@@ -69,7 +69,7 @@ sops:
     suffix: "-from-ops"
   ops:
     endpoint: "https://ops-server.your-company.com"
-    token: "${SOPS_OPS_TOKEN}"
+    token: ""
 
 events:
   enabled: false
@@ -78,7 +78,7 @@ events:
     suffix: "-from-ops"
   ops:
     endpoint: "https://ops-server.your-company.com"
-    token: "${EVENTS_OPS_TOKEN}"
+    token: ""
 
 metrics:
   enabled: false
@@ -88,9 +88,10 @@ metrics:
   prometheus:
     endpoint: "https://prometheus.your-company.com"
     # Authentication (priority: token > basic auth > none)
-    username: "${METRICS_PROMETHEUS_USERNAME}"      # Optional
-    password: "${METRICS_PROMETHEUS_PASSWORD}"      # Optional
-    token: "${METRICS_PROMETHEUS_TOKEN}"            # Optional
+    # Set via environment variables: METRICS_PROMETHEUS_USERNAME, METRICS_PROMETHEUS_PASSWORD, METRICS_PROMETHEUS_TOKEN
+    username: ""    # Optional: Basic auth username
+    password: ""    # Optional: Basic auth password
+    token: ""       # Optional: Bearer token
     timeout: 30
 
 logs:
@@ -101,9 +102,10 @@ logs:
   elasticsearch:
     endpoint: "https://elasticsearch.your-company.com"
     # Authentication (priority: api_key > basic auth > none)
-    username: "${LOGS_ELASTICSEARCH_USERNAME}"    # Optional
-    password: "${LOGS_ELASTICSEARCH_PASSWORD}"    # Optional
-    api_key: "${LOGS_ELASTICSEARCH_API_KEY}"      # Optional
+    # Set via environment variables: LOGS_ELASTICSEARCH_USERNAME, LOGS_ELASTICSEARCH_PASSWORD, LOGS_ELASTICSEARCH_API_KEY
+    username: ""    # Optional: Basic auth username
+    password: ""    # Optional: Basic auth password
+    api_key: ""     # Optional: Elasticsearch API key
     timeout: 30
 
 traces:
@@ -176,7 +178,7 @@ Set the `SERVER_TOKEN` environment variable or configure it in the YAML file:
 
 ```yaml
 server:
-  token: "${SERVER_TOKEN}"
+  token: ""  # Set via SERVER_TOKEN environment variable
 ```
 
 ### Usage

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -120,6 +121,70 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(version.String())
 	},
+}
+
+// applyEnvOverrides applies environment variable overrides to the config
+// This allows environment variables to override even empty strings in config file
+func applyEnvOverrides(cfg *config.Config) {
+	// Helper function to get env var and override if not empty
+	overrideString := func(target *string, envKey string) {
+		if envVal := os.Getenv(envKey); envVal != "" {
+			*target = envVal
+		}
+	}
+	overrideInt := func(target *int, envKey string) {
+		if envVal := os.Getenv(envKey); envVal != "" {
+			if val, err := strconv.Atoi(envVal); err == nil {
+				*target = val
+			}
+		}
+	}
+
+	// Prometheus config overrides
+	if cfg.Metrics.Prometheus != nil {
+		overrideString(&cfg.Metrics.Prometheus.Endpoint, "METRICS_PROMETHEUS_ENDPOINT")
+		overrideString(&cfg.Metrics.Prometheus.Username, "METRICS_PROMETHEUS_USERNAME")
+		overrideString(&cfg.Metrics.Prometheus.Password, "METRICS_PROMETHEUS_PASSWORD")
+		overrideString(&cfg.Metrics.Prometheus.Token, "METRICS_PROMETHEUS_TOKEN")
+		overrideInt(&cfg.Metrics.Prometheus.Timeout, "METRICS_PROMETHEUS_TIMEOUT")
+	}
+
+	// Elasticsearch config overrides
+	if cfg.Logs.Elasticsearch != nil {
+		overrideString(&cfg.Logs.Elasticsearch.Endpoint, "LOGS_ELASTICSEARCH_ENDPOINT")
+		overrideString(&cfg.Logs.Elasticsearch.Username, "LOGS_ELASTICSEARCH_USERNAME")
+		overrideString(&cfg.Logs.Elasticsearch.Password, "LOGS_ELASTICSEARCH_PASSWORD")
+		overrideString(&cfg.Logs.Elasticsearch.APIKey, "LOGS_ELASTICSEARCH_API_KEY")
+		overrideInt(&cfg.Logs.Elasticsearch.Timeout, "LOGS_ELASTICSEARCH_TIMEOUT")
+	}
+
+	// SOPS Ops config overrides
+	if cfg.Sops.Ops != nil {
+		overrideString(&cfg.Sops.Ops.Endpoint, "SOPS_OPS_ENDPOINT")
+		overrideString(&cfg.Sops.Ops.Token, "SOPS_OPS_TOKEN")
+	}
+
+	// Events Ops config overrides
+	if cfg.Events.Ops != nil {
+		overrideString(&cfg.Events.Ops.Endpoint, "EVENTS_OPS_ENDPOINT")
+		overrideString(&cfg.Events.Ops.Token, "EVENTS_OPS_TOKEN")
+	}
+
+	// Jaeger config overrides
+	if cfg.Traces.Jaeger != nil {
+		overrideString(&cfg.Traces.Jaeger.Endpoint, "TRACES_JAEGER_ENDPOINT")
+		overrideInt(&cfg.Traces.Jaeger.Timeout, "TRACES_JAEGER_TIMEOUT")
+	}
+
+	// Server config overrides
+	overrideString(&cfg.Server.Host, "SERVER_HOST")
+	overrideString(&cfg.Server.Mode, "SERVER_MODE")
+	overrideString(&cfg.Server.URI, "SERVER_URI")
+	overrideString(&cfg.Server.Token, "SERVER_TOKEN")
+	overrideInt(&cfg.Server.Port, "SERVER_PORT")
+
+	// Log level override
+	overrideString(&cfg.Log.Level, "LOG_LEVEL")
 }
 
 func init() {
@@ -249,6 +314,10 @@ func runServer(cmd *cobra.Command, args []string) {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		logger.Fatal("Failed to unmarshal config", zap.Error(err))
 	}
+
+	// Apply environment variable overrides
+	// This allows environment variables to override empty values from config file
+	applyEnvOverrides(&cfg)
 
 	// Module enablement logic: CLI flags take precedence over environment variables
 	// If CLI flag is set, use CLI value; otherwise use environment variable; otherwise use default (false)
@@ -423,6 +492,9 @@ func runServer(cmd *cobra.Command, args []string) {
 		if cfg.Metrics.Prometheus != nil {
 			metricsConfig.Prometheus = &metricsModule.PrometheusConfig{
 				Endpoint: cfg.Metrics.Prometheus.Endpoint,
+				Username: cfg.Metrics.Prometheus.Username,
+				Password: cfg.Metrics.Prometheus.Password,
+				Token:    cfg.Metrics.Prometheus.Token,
 			}
 		}
 
@@ -759,6 +831,9 @@ func runServer(cmd *cobra.Command, args []string) {
 				if cfg.Metrics.Prometheus != nil {
 					metricsConfig.Prometheus = &metricsModule.PrometheusConfig{
 						Endpoint: cfg.Metrics.Prometheus.Endpoint,
+						Username: cfg.Metrics.Prometheus.Username,
+						Password: cfg.Metrics.Prometheus.Password,
+						Token:    cfg.Metrics.Prometheus.Token,
 					}
 				}
 				metricsModuleInstance, err := metricsModule.New(metricsConfig, logger)
