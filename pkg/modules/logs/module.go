@@ -57,7 +57,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 
 	// Elasticsearch configuration is optional - module can be created without it
 
-	timeout := 30 * time.Second
+	timeout := 120 * time.Second // Increase default timeout to 120 seconds
 	if config.Elasticsearch != nil && config.Elasticsearch.Timeout > 0 {
 		timeout = time.Duration(config.Elasticsearch.Timeout) * time.Second
 	}
@@ -69,16 +69,16 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		MaxConnsPerHost:     20,               // Reduce maximum connections per host
 		IdleConnTimeout:     30 * time.Second, // Significantly reduce idle connection timeout for faster release
 		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second, // Reduce connection timeout
+			Timeout:   30 * time.Second, // Increase connection timeout
 			KeepAlive: 15 * time.Second, // Reduce keep-alive interval
 		}).DialContext,
-		TLSHandshakeTimeout:   5 * time.Second, // Reduce TLS handshake timeout
+		TLSHandshakeTimeout:   10 * time.Second, // Increase TLS handshake timeout
 		ExpectContinueTimeout: 1 * time.Second,
 		DisableKeepAlives:     false, // Enable connection reuse
 		ForceAttemptHTTP2:     false, // Force HTTP/1.1 for better connection reuse
 		// Add connection cleanup mechanism
-		ResponseHeaderTimeout: 10 * time.Second, // Response header timeout
-		DisableCompression:    false,            // Enable compression to reduce transmission time
+		ResponseHeaderTimeout: timeout, // Use configured timeout for response headers
+		DisableCompression:    false,   // Enable compression to reduce transmission time
 	}
 
 	m := &Module{
@@ -86,7 +86,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		logger: logger.Named("logs"),
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   15 * time.Second, // Reduce client timeout for faster connection release
+			Timeout:   timeout, // Use configured timeout for client
 		},
 	}
 
