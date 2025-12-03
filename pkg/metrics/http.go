@@ -27,7 +27,7 @@ func HTTPMetricsMiddleware(next http.Handler, mode string) http.Handler {
 		// Wrap response writer to capture status code and size
 		rw := &responseWriter{
 			ResponseWriter: w,
-			statusCode:    http.StatusOK,
+			statusCode:     http.StatusOK,
 		}
 
 		// Increment in-flight requests
@@ -81,3 +81,9 @@ func (rw *responseWriter) ReadFrom(r io.Reader) (int64, error) {
 	return n, err
 }
 
+// Flush implements http.Flusher to support streaming responses (e.g., SSE)
+func (rw *responseWriter) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}

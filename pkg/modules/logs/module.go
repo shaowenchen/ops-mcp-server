@@ -971,7 +971,15 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 
 	resp, err := m.makeElasticsearchRequest(ctx, "GET", path, nil)
 	if err != nil {
-		return nil, err
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to execute Elasticsearch request: %v", err),
+				},
+			},
+		}, nil
 	}
 	defer func() {
 		if resp != nil && resp.Body != nil {
@@ -981,11 +989,27 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to read response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("elasticsearch error (%d): %s", resp.StatusCode, string(responseData))
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", resp.StatusCode, string(responseData)),
+				},
+			},
+		}, nil
 	}
 
 	// Parse response based on format
@@ -993,7 +1017,15 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 	if params.Get("format") == "json" {
 		var indices []ElasticsearchIndex
 		if err := json.Unmarshal(responseData, &indices); err != nil {
-			return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Failed to parse JSON response: %v", err),
+					},
+				},
+			}, nil
 		}
 		result = map[string]interface{}{
 			"indices": indices,
@@ -1005,7 +1037,15 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 
 	data, err := json.Marshal(result)
 	if err != nil {
-		return nil, err
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to marshal response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	return &mcp.CallToolResult{
@@ -1023,7 +1063,15 @@ func (m *Module) handleGetMappings(ctx context.Context, request mcp.CallToolRequ
 
 	indexName, ok := args["index"].(string)
 	if !ok || indexName == "" {
-		return nil, fmt.Errorf("index parameter is required")
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: "index parameter is required",
+				},
+			},
+		}, nil
 	}
 
 	includeSettings := false
@@ -1035,22 +1083,54 @@ func (m *Module) handleGetMappings(ctx context.Context, request mcp.CallToolRequ
 	mappingsPath := fmt.Sprintf("%s/_mapping", indexName)
 	mappingsResp, err := m.makeElasticsearchRequest(ctx, "GET", mappingsPath, nil)
 	if err != nil {
-		return nil, err
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to execute Elasticsearch request: %v", err),
+				},
+			},
+		}, nil
 	}
 	defer mappingsResp.Body.Close()
 
 	mappingsData, err := io.ReadAll(mappingsResp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read mappings response: %w", err)
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to read mappings response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	if mappingsResp.StatusCode >= 400 {
-		return nil, fmt.Errorf("elasticsearch error (%d): %s", mappingsResp.StatusCode, string(mappingsData))
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Elasticsearch returned status %d: %s", mappingsResp.StatusCode, string(mappingsData)),
+				},
+			},
+		}, nil
 	}
 
 	var mappings map[string]interface{}
 	if err := json.Unmarshal(mappingsData, &mappings); err != nil {
-		return nil, fmt.Errorf("failed to parse mappings response: %w", err)
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to parse mappings response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	result := map[string]interface{}{
@@ -1078,7 +1158,15 @@ func (m *Module) handleGetMappings(ctx context.Context, request mcp.CallToolRequ
 
 	data, err := json.Marshal(result)
 	if err != nil {
-		return nil, err
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("Failed to marshal response: %v", err),
+				},
+			},
+		}, nil
 	}
 
 	return &mcp.CallToolResult{
@@ -1094,25 +1182,57 @@ func (m *Module) handleGetMappings(ctx context.Context, request mcp.CallToolRequ
 func (m *Module) handleElasticsearchSearch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Check if Elasticsearch is configured
 	if m.config.Elasticsearch == nil || m.config.Elasticsearch.Endpoint == "" {
-		return nil, fmt.Errorf("Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config")
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: "Elasticsearch configuration not found - please set logs.elasticsearch.endpoint in config",
+				},
+			},
+		}, nil
 	}
 
 	args := request.GetArguments()
 
 	indexName, ok := args["index"].(string)
 	if !ok || indexName == "" {
-		return nil, fmt.Errorf("index parameter is required")
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: "index parameter is required",
+				},
+			},
+		}, nil
 	}
 
 	bodyStr, ok := args["body"].(string)
 	if !ok || bodyStr == "" {
-		return nil, fmt.Errorf("body parameter is required")
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: "body parameter is required",
+				},
+			},
+		}, nil
 	}
 
 	// Parse the complete ES query body
 	var searchRequest map[string]interface{}
 	if err := json.Unmarshal([]byte(bodyStr), &searchRequest); err != nil {
-		return nil, fmt.Errorf("invalid query body JSON: %w", err)
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("invalid query body JSON: %v. Please ensure the body parameter is a valid JSON string.", err),
+				},
+			},
+		}, nil
 	}
 
 	// Log the query for debugging
