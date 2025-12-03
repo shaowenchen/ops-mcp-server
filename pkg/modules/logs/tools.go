@@ -59,17 +59,19 @@ func (m *Module) BuildTools(toolsConfig LogsToolsConfig) []server.ServerTool {
 
 	// Elasticsearch Search Tool
 	if toolsConfig.Search.Enabled {
+		toolName := m.BuildToolName(toolsConfig.Search.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildSearchToolDefinition(toolsConfig.Search),
-			Handler: m.handleElasticsearchSearch,
+			Handler: metrics.WrapToolHandler(m.handleElasticsearchSearch, toolName, "logs"),
 		})
 	}
 
 	// List Indices Tool
 	if toolsConfig.ListIndices.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ListIndices.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildListIndicesToolDefinition(toolsConfig.ListIndices),
-			Handler: m.handleListIndices,
+			Handler: metrics.WrapToolHandler(m.handleListIndices, toolName, "logs"),
 		})
 	}
 

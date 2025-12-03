@@ -4,12 +4,19 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // HTTPMetricsMiddleware wraps an HTTP handler to collect metrics
 func HTTPMetricsMiddleware(next http.Handler, mode string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip metrics collection for healthz endpoint
+		if r.URL.Path == "/healthz" || r.URL.Path == "/mcp/healthz" || strings.HasSuffix(r.URL.Path, "/healthz") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		start := time.Now()
 
 		// Get endpoint from path

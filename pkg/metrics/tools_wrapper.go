@@ -12,21 +12,22 @@ import (
 func WrapToolHandler(handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error), toolName, moduleName string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
-		
+
 		// Record module request
 		RecordModuleRequest(moduleName)
-		
+
 		// Call the actual handler
 		result, err := handler(ctx, request)
-		
+
 		duration := time.Since(start)
-		success := err == nil
-		
+		// Success is determined by: no error AND result is not marked as error
+		success := err == nil && (result == nil || !result.IsError)
+
 		// Record tool call metrics
 		RecordMCPToolCall(toolName, moduleName, duration, success)
-		
-		// Record error if any
-		if err != nil {
+
+		// Record error if any (either handler returned error or result has IsError=true)
+		if err != nil || (result != nil && result.IsError) {
 			errorType := "unknown"
 			if err.Error() != "" {
 				// Try to categorize error
@@ -45,8 +46,7 @@ func WrapToolHandler(handler func(context.Context, mcp.CallToolRequest) (*mcp.Ca
 			}
 			RecordMCPToolError(toolName, moduleName, errorType)
 		}
-		
+
 		return result, err
 	}
 }
-
