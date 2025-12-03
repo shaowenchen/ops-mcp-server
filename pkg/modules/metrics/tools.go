@@ -31,7 +31,7 @@ func GetDefaultToolsConfig() MetricsToolsConfig {
 		QueryMetrics: ToolConfig{
 			Enabled:     true,
 			Name:        "query-metrics",
-			Description: "Execute a custom PromQL instant query. Examples: 'up', 'cpu_usage_percent', 'sum(rate(http_requests_total[5m]))'",
+			Description: "Execute a custom PromQL instant query. Examples: 'up', 'cpu_usage_percent', 'sum(rate(ops_mcp_server_http_requests_total[5m]))'",
 		},
 		QueryRange: ToolConfig{
 			Enabled:     true,

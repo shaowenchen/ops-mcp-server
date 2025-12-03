@@ -26,7 +26,7 @@ spec:
       metricRelabelings:
         # Keep only metrics we care about (optional)
         # - action: keep
-        #   regex: 'http_|sse_|mcp_|module_|backend_|auth_|process_|build_info'
+        #   regex: 'ops_mcp_server_'
   namespaceSelector:
     matchNames:
       - ops-system

@@ -66,7 +66,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// HTTP metrics
 	m.HTTPRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_requests_total",
+			Name: "ops_mcp_server_http_requests_total",
 			Help: "Total number of HTTP requests",
 		},
 		[]string{"method", "endpoint", "status_code", "mode"},
@@ -74,7 +74,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.HTTPRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "http_request_duration_seconds",
+			Name:    "ops_mcp_server_http_request_duration_seconds",
 			Help:    "HTTP request duration in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
@@ -83,7 +83,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.HTTPRequestSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "http_request_size_bytes",
+			Name:    "ops_mcp_server_http_request_size_bytes",
 			Help:    "HTTP request size in bytes",
 			Buckets: prometheus.ExponentialBuckets(100, 10, 7), // 100B to 100MB
 		},
@@ -92,7 +92,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.HTTPResponseSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "http_response_size_bytes",
+			Name:    "ops_mcp_server_http_response_size_bytes",
 			Help:    "HTTP response size in bytes",
 			Buckets: prometheus.ExponentialBuckets(100, 10, 7), // 100B to 100MB
 		},
@@ -101,7 +101,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.HTTPRequestsInFlight = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "http_requests_in_flight",
+			Name: "ops_mcp_server_http_requests_in_flight",
 			Help: "Number of HTTP requests currently being processed",
 		},
 		[]string{"endpoint"},
@@ -110,21 +110,21 @@ func Init(logger *zap.Logger) *Metrics {
 	// SSE metrics
 	m.SSEConnectionsTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "sse_connections_total",
+			Name: "ops_mcp_server_sse_connections_total",
 			Help: "Total number of SSE connections",
 		},
 	)
 
 	m.SSEActiveConnections = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "sse_active_connections",
+			Name: "ops_mcp_server_sse_active_connections",
 			Help: "Number of active SSE connections",
 		},
 	)
 
 	m.SSEConnectionDuration = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "sse_connection_duration_seconds",
+			Name:    "ops_mcp_server_sse_connection_duration_seconds",
 			Help:    "SSE connection duration in seconds",
 			Buckets: []float64{1, 5, 10, 30, 60, 300, 600, 1800, 3600}, // 1s to 1h
 		},
@@ -133,7 +133,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// MCP tool metrics
 	m.MCPToolCallsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "mcp_tool_calls_total",
+			Name: "ops_mcp_server_mcp_tool_calls_total",
 			Help: "Total number of MCP tool calls",
 		},
 		[]string{"tool_name", "module", "status"},
@@ -141,7 +141,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.MCPToolCallDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "mcp_tool_call_duration_seconds",
+			Name:    "ops_mcp_server_mcp_tool_call_duration_seconds",
 			Help:    "MCP tool call duration in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
@@ -150,7 +150,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.MCPToolErrorsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "mcp_tool_errors_total",
+			Name: "ops_mcp_server_mcp_tool_errors_total",
 			Help: "Total number of MCP tool errors",
 		},
 		[]string{"tool_name", "module", "error_type"},
@@ -159,7 +159,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// Module metrics
 	m.ModuleEnabled = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "module_enabled",
+			Name: "ops_mcp_server_module_enabled",
 			Help: "Module enabled status (0=disabled, 1=enabled)",
 		},
 		[]string{"module_name"},
@@ -167,7 +167,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.ModuleRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "module_requests_total",
+			Name: "ops_mcp_server_module_requests_total",
 			Help: "Total number of requests per module",
 		},
 		[]string{"module_name"},
@@ -176,7 +176,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// Backend service metrics
 	m.BackendRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "backend_requests_total",
+			Name: "ops_mcp_server_backend_requests_total",
 			Help: "Total number of backend service requests",
 		},
 		[]string{"backend", "status"},
@@ -184,7 +184,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.BackendRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "backend_request_duration_seconds",
+			Name:    "ops_mcp_server_backend_request_duration_seconds",
 			Help:    "Backend service request duration in seconds",
 			Buckets: prometheus.DefBuckets,
 		},
@@ -193,7 +193,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.BackendErrorsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "backend_errors_total",
+			Name: "ops_mcp_server_backend_errors_total",
 			Help: "Total number of backend service errors",
 		},
 		[]string{"backend", "error_type"},
@@ -202,7 +202,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// Auth metrics
 	m.AuthRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_requests_total",
+			Name: "ops_mcp_server_auth_requests_total",
 			Help: "Total number of authentication requests",
 		},
 		[]string{"status"},
@@ -210,7 +210,7 @@ func Init(logger *zap.Logger) *Metrics {
 
 	m.AuthValidationDuration = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "auth_token_validation_duration_seconds",
+			Name:    "ops_mcp_server_auth_token_validation_duration_seconds",
 			Help:    "Authentication token validation duration in seconds",
 			Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1},
 		},
@@ -219,14 +219,14 @@ func Init(logger *zap.Logger) *Metrics {
 	// System metrics
 	m.ProcessGoroutines = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "process_goroutines",
+			Name: "ops_mcp_server_process_goroutines",
 			Help: "Number of goroutines",
 		},
 	)
 
 	m.ProcessMemoryBytes = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "process_memory_bytes",
+			Name: "ops_mcp_server_process_memory_bytes",
 			Help: "Process memory usage in bytes",
 		},
 		[]string{"type"},
@@ -235,7 +235,7 @@ func Init(logger *zap.Logger) *Metrics {
 	// Build info metric
 	m.BuildInfo = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "build_info",
+			Name: "ops_mcp_server_build_info",
 			Help: "Build information",
 		},
 		[]string{"version", "git_commit", "build_date"},

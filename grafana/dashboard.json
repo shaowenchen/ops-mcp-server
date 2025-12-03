@@ -14,7 +14,7 @@
       "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
       "targets": [
         {
-          "expr": "rate(http_requests_total[5m])",
+          "expr": "rate(ops_mcp_server_http_requests_total[5m])",
           "legendFormat": "{{method}} {{endpoint}} - {{status_code}}",
           "refId": "A"
         }
@@ -32,7 +32,7 @@
         "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(ops_mcp_server_http_request_duration_seconds_bucket[5m]))",
             "legendFormat": "{{method}} {{endpoint}}",
             "refId": "A"
           }
@@ -50,7 +50,7 @@
         "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "http_requests_in_flight",
+            "expr": "ops_mcp_server_http_requests_in_flight",
             "legendFormat": "{{endpoint}}",
             "refId": "A"
           }
@@ -68,7 +68,7 @@
         "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "sum(rate(http_requests_total[5m])) by (status_code)",
+            "expr": "sum(rate(ops_mcp_server_http_requests_total[5m])) by (status_code)",
             "legendFormat": "{{status_code}}",
             "refId": "A"
           }
@@ -81,7 +81,7 @@
         "gridPos": {"x": 0, "y": 16, "w": 6, "h": 4},
         "targets": [
           {
-            "expr": "sse_active_connections",
+            "expr": "ops_mcp_server_sse_active_connections",
             "refId": "A"
           }
         ],
@@ -105,7 +105,7 @@
         "gridPos": {"x": 6, "y": 16, "w": 9, "h": 4},
         "targets": [
           {
-            "expr": "rate(sse_connections_total[5m])",
+            "expr": "rate(ops_mcp_server_sse_connections_total[5m])",
             "legendFormat": "Connections/sec",
             "refId": "A"
           }
@@ -123,12 +123,12 @@
         "gridPos": {"x": 15, "y": 16, "w": 9, "h": 4},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(sse_connection_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(ops_mcp_server_sse_connection_duration_seconds_bucket[5m]))",
             "legendFormat": "p95",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.99, rate(sse_connection_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.99, rate(ops_mcp_server_sse_connection_duration_seconds_bucket[5m]))",
             "legendFormat": "p99",
             "refId": "B"
           }
@@ -146,7 +146,7 @@
         "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "rate(mcp_tool_calls_total[5m])",
+            "expr": "rate(ops_mcp_server_mcp_tool_calls_total[5m])",
             "legendFormat": "{{tool_name}} ({{module}}) - {{status}}",
             "refId": "A"
           }
@@ -164,12 +164,12 @@
         "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(mcp_tool_call_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket[5m]))",
             "legendFormat": "{{tool_name}} ({{module}}) - p95",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.99, rate(mcp_tool_call_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.99, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket[5m]))",
             "legendFormat": "{{tool_name}} ({{module}}) - p99",
             "refId": "B"
           }
@@ -187,7 +187,7 @@
         "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "rate(mcp_tool_errors_total[5m])",
+            "expr": "rate(ops_mcp_server_mcp_tool_errors_total[5m])",
             "legendFormat": "{{tool_name}} ({{module}}) - {{error_type}}",
             "refId": "A"
           }
@@ -205,7 +205,7 @@
         "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "rate(module_requests_total[5m])",
+            "expr": "rate(ops_mcp_server_module_requests_total[5m])",
             "legendFormat": "{{module_name}}",
             "refId": "A"
           }
@@ -223,7 +223,7 @@
         "gridPos": {"x": 0, "y": 36, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "module_enabled",
+            "expr": "ops_mcp_server_module_enabled",
             "format": "table",
             "instant": true,
             "refId": "A"
@@ -255,7 +255,7 @@
         "gridPos": {"x": 12, "y": 36, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "rate(backend_requests_total[5m])",
+            "expr": "rate(ops_mcp_server_backend_requests_total[5m])",
             "legendFormat": "{{backend}} - {{status}}",
             "refId": "A"
           }
@@ -273,12 +273,12 @@
         "gridPos": {"x": 0, "y": 42, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(backend_request_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(ops_mcp_server_backend_request_duration_seconds_bucket[5m]))",
             "legendFormat": "{{backend}} - p95",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.99, rate(backend_request_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.99, rate(ops_mcp_server_backend_request_duration_seconds_bucket[5m]))",
             "legendFormat": "{{backend}} - p99",
             "refId": "B"
           }
@@ -296,7 +296,7 @@
         "gridPos": {"x": 12, "y": 42, "w": 12, "h": 8},
         "targets": [
           {
-            "expr": "rate(backend_errors_total[5m])",
+            "expr": "rate(ops_mcp_server_backend_errors_total[5m])",
             "legendFormat": "{{backend}} - {{error_type}}",
             "refId": "A"
           }
@@ -314,7 +314,7 @@
         "gridPos": {"x": 0, "y": 50, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "rate(auth_requests_total[5m])",
+            "expr": "rate(ops_mcp_server_auth_requests_total[5m])",
             "legendFormat": "{{status}}",
             "refId": "A"
           }
@@ -332,12 +332,12 @@
         "gridPos": {"x": 12, "y": 50, "w": 12, "h": 6},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(auth_token_validation_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(ops_mcp_server_auth_token_validation_duration_seconds_bucket[5m]))",
             "legendFormat": "p95",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.99, rate(auth_token_validation_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.99, rate(ops_mcp_server_auth_token_validation_duration_seconds_bucket[5m]))",
             "legendFormat": "p99",
             "refId": "B"
           }
@@ -355,7 +355,7 @@
         "gridPos": {"x": 0, "y": 56, "w": 8, "h": 6},
         "targets": [
           {
-            "expr": "process_goroutines",
+            "expr": "ops_mcp_server_process_goroutines",
             "legendFormat": "Goroutines",
             "refId": "A"
           }
@@ -373,7 +373,7 @@
         "gridPos": {"x": 8, "y": 56, "w": 8, "h": 6},
         "targets": [
           {
-            "expr": "process_memory_bytes",
+            "expr": "ops_mcp_server_process_memory_bytes",
             "legendFormat": "{{type}}",
             "refId": "A"
           }
@@ -391,7 +391,7 @@
         "gridPos": {"x": 16, "y": 56, "w": 8, "h": 6},
         "targets": [
           {
-            "expr": "build_info",
+            "expr": "ops_mcp_server_build_info",
             "format": "table",
             "instant": true,
             "refId": "A"
