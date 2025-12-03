@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	appMetrics "github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 )
 
 // ToolConfig defines configuration for a single tool
@@ -58,25 +59,28 @@ func (m *Module) BuildTools(toolsConfig MetricsToolsConfig) []server.ServerTool 
 
 	// List Metrics Tool
 	if toolsConfig.ListMetrics.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ListMetrics.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildListMetricsToolDefinition(toolsConfig.ListMetrics),
-			Handler: m.handleListMetrics,
+			Handler: appMetrics.WrapToolHandler(m.handleListMetrics, toolName, "metrics"),
 		})
 	}
 
 	// Query Metrics Tool
 	if toolsConfig.QueryMetrics.Enabled {
+		toolName := m.BuildToolName(toolsConfig.QueryMetrics.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildQueryMetricsToolDefinition(toolsConfig.QueryMetrics),
-			Handler: m.handleExecuteQuery,
+			Handler: appMetrics.WrapToolHandler(m.handleExecuteQuery, toolName, "metrics"),
 		})
 	}
 
 	// Query Range Tool
 	if toolsConfig.QueryRange.Enabled {
+		toolName := m.BuildToolName(toolsConfig.QueryRange.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildQueryRangeToolDefinition(toolsConfig.QueryRange),
-			Handler: m.handleExecuteRangeQuery,
+			Handler: appMetrics.WrapToolHandler(m.handleExecuteRangeQuery, toolName, "metrics"),
 		})
 	}
 

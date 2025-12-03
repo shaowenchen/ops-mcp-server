@@ -21,6 +21,16 @@ spec:
       labels:
         app: ops-mcp-server
         version: v1.0.0
+        # Prometheus service discovery labels
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/mcp/metrics"
+      annotations:
+        # Prometheus scrape configuration
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/mcp/metrics"
+        prometheus.io/scheme: "http"
     spec:
       securityContext:
         runAsNonRoot: true

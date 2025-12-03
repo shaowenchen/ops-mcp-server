@@ -6,10 +6,21 @@ metadata:
   labels:
     app: ops-mcp-server
     version: v1.0.0
+  annotations:
+    # Prometheus scrape configuration
+    # Prometheus will discover pods via pod annotations, but we can also add service-level annotations
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/mcp/metrics"
+    prometheus.io/scheme: "http"
 spec:
   type: ClusterIP
   ports:
     - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: metrics
       port: 80
       targetPort: 80
       protocol: TCP

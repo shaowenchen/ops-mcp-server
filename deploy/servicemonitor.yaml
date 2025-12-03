@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ops-mcp-server
+  namespace: ops-system
+  labels:
+    app: ops-mcp-server
+    release: prometheus  # Change this to match your Prometheus Operator release name
+spec:
+  selector:
+    matchLabels:
+      app: ops-mcp-server
+  endpoints:
+    - port: metrics
+      path: /mcp/metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      scheme: http
+      # Optional: Add relabeling configs
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+      # Optional: Add metric relabeling
+      metricRelabelings:
+        # Keep only metrics we care about (optional)
+        # - action: keep
+        #   regex: 'http_|sse_|mcp_|module_|backend_|auth_|process_|build_info'
+  namespaceSelector:
+    matchNames:
+      - ops-system
+

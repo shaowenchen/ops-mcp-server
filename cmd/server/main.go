@@ -18,6 +18,7 @@ import (
 	"github.com/shaowenchen/ops-mcp-server/cmd/version"
 	"github.com/shaowenchen/ops-mcp-server/pkg/config"
 	"github.com/shaowenchen/ops-mcp-server/pkg/docs"
+	"github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
 	logsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/logs"
 	metricsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/metrics"
@@ -404,6 +405,23 @@ func runServer(cmd *cobra.Command, args []string) {
 		zap.Bool("traces_enabled", cfg.Traces.Enabled),
 	)
 
+	// Initialize metrics system
+	metrics.Init(logger)
+	
+	// Set build info
+	versionInfo := version.Get()
+	metrics.SetBuildInfo(versionInfo.Version, versionInfo.GitCommit, versionInfo.BuildDate)
+	
+	// Set module enabled status
+	metrics.Get().SetModuleEnabled("sops", cfg.Sops.Enabled)
+	metrics.Get().SetModuleEnabled("events", cfg.Events.Enabled)
+	metrics.Get().SetModuleEnabled("metrics", cfg.Metrics.Enabled)
+	metrics.Get().SetModuleEnabled("logs", cfg.Logs.Enabled)
+	metrics.Get().SetModuleEnabled("traces", cfg.Traces.Enabled)
+	
+	// Start system metrics collector
+	metrics.StartSystemMetricsCollector(logger)
+
 	// Create MCP server
 	mcpServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
 
@@ -641,9 +659,12 @@ func runServer(cmd *cobra.Command, args []string) {
 		// Get MCP URI from config and normalize it
 		mcpURI := normalizeURI(cfg.Server.URI)
 
-		// Add health check endpoint
+		// Add metrics endpoint (before middleware to avoid auth)
+		mux.Handle(mcpURI+"/metrics", metrics.Handler())
+
+		// Add health check endpoint with metrics
 		healthEndpoint := mcpURI + "/healthz"
-		mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		mux.Handle(healthEndpoint, metrics.HTTPMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet {
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
@@ -688,7 +709,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			}
 
 			json.NewEncoder(w).Encode(healthResponse)
-		})
+		}), serverMode))
 
 		// Create custom HTTP server with optimized timeouts for MCP and TIME_WAIT management
 		httpServer := &http.Server{
@@ -716,7 +737,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		sseEndpoint := mcpURI + "/sse"
 		messageEndpoint := mcpURI + "/message"
 
-		// Create wrapped handlers with debug logging
+		// Create wrapped handlers with debug logging and metrics
 		sseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if logLevel == "debug" {
 				logger.Debug("SSE connection request",
@@ -727,7 +748,10 @@ func runServer(cmd *cobra.Command, args []string) {
 					zap.Strings("headers", getHeaderStrings(r.Header)),
 				)
 			}
+			metrics.RecordSSEConnection()
+			startTime := time.Now()
 			sseServer.SSEHandler().ServeHTTP(w, r)
+			metrics.RecordSSEDisconnection(time.Since(startTime))
 		})
 
 		messageHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -745,9 +769,9 @@ func runServer(cmd *cobra.Command, args []string) {
 			sseServer.MessageHandler().ServeHTTP(w, r)
 		})
 
-		// Apply authentication middleware to SSE and message endpoints
-		mux.Handle(sseEndpoint, authMiddleware(cfg.Server.Token)(sseHandler))
-		mux.Handle(messageEndpoint, authMiddleware(cfg.Server.Token)(messageHandler))
+		// Apply authentication middleware and metrics middleware to SSE and message endpoints
+		mux.Handle(sseEndpoint, metrics.HTTPMetricsMiddleware(authMiddleware(cfg.Server.Token)(sseHandler), serverMode))
+		mux.Handle(messageEndpoint, metrics.HTTPMetricsMiddleware(authMiddleware(cfg.Server.Token)(messageHandler), serverMode))
 
 		// Create a custom MCP handler that can parse query parameters
 		mcpHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -928,12 +952,12 @@ func runServer(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		// Mount MCP handler to the mux with authentication middleware
-		mux.Handle(mcpURI, authMiddleware(cfg.Server.Token)(http.HandlerFunc(mcpHandler)))
+		// Mount MCP handler to the mux with authentication and metrics middleware
+		mux.Handle(mcpURI, metrics.HTTPMetricsMiddleware(authMiddleware(cfg.Server.Token)(http.HandlerFunc(mcpHandler)), serverMode))
 
-		// Add docs endpoint
+		// Add docs endpoint with metrics
 		docsHandler := docs.NewHandler(&cfg, logger)
-		mux.HandleFunc(mcpURI+"/docs", docsHandler.HandleDocs)
+		mux.Handle(mcpURI+"/docs", metrics.HTTPMetricsMiddleware(http.HandlerFunc(docsHandler.HandleDocs), serverMode))
 
 		// Start SSE server
 		logger.Info("Starting server in SSE mode with health check",
@@ -967,8 +991,11 @@ func getHeaderStrings(headers http.Header) []string {
 func authMiddleware(expectedToken string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			
 			// Skip authentication if no token is configured
 			if expectedToken == "" {
+				metrics.RecordAuthRequest(true, true)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -976,12 +1003,16 @@ func authMiddleware(expectedToken string) func(http.Handler) http.Handler {
 			// Get token from Authorization header (Bearer token)
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
+				metrics.RecordAuthRequest(false, false)
+				metrics.RecordAuthValidationDuration(time.Since(start))
 				http.Error(w, "Authorization header required", http.StatusUnauthorized)
 				return
 			}
 
 			// Check for Bearer token format
 			if !strings.HasPrefix(authHeader, "Bearer ") {
+				metrics.RecordAuthRequest(false, false)
+				metrics.RecordAuthValidationDuration(time.Since(start))
 				http.Error(w, "Invalid authorization format. Expected 'Bearer <token>'", http.StatusUnauthorized)
 				return
 			}
@@ -989,17 +1020,23 @@ func authMiddleware(expectedToken string) func(http.Handler) http.Handler {
 			// Extract token
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 			if token == "" {
+				metrics.RecordAuthRequest(false, false)
+				metrics.RecordAuthValidationDuration(time.Since(start))
 				http.Error(w, "Token required", http.StatusUnauthorized)
 				return
 			}
 
 			// Validate token
 			if token != expectedToken {
+				metrics.RecordAuthRequest(false, false)
+				metrics.RecordAuthValidationDuration(time.Since(start))
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return
 			}
 
 			// Token is valid, proceed to next handler
+			metrics.RecordAuthRequest(true, false)
+			metrics.RecordAuthValidationDuration(time.Since(start))
 			next.ServeHTTP(w, r)
 		})
 	}

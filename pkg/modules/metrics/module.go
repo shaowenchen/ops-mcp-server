@@ -15,6 +15,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	appMetrics "github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 	"go.uber.org/zap"
 )
 
@@ -135,13 +136,38 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 		authMethod = "basic_auth"
 	}
 
+	start := time.Now()
 	resp, err := m.httpClient.Do(req)
+	duration := time.Since(start)
+	
 	if err != nil {
 		m.logger.Error("Prometheus Request Failed",
 			zap.String("method", method),
 			zap.String("url", url),
 			zap.Error(err))
+		// Record backend metrics
+		appMetrics.RecordBackendRequest(appMetrics.BackendPrometheus, duration, false)
+		if err.Error() != "" {
+			errorType := "network_error"
+			if strings.Contains(strings.ToLower(err.Error()), "timeout") {
+				errorType = "timeout"
+			}
+			appMetrics.RecordBackendError(appMetrics.BackendPrometheus, errorType)
+		}
 		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	
+	// Record backend metrics
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	appMetrics.RecordBackendRequest(appMetrics.BackendPrometheus, duration, success)
+	if !success {
+		errorType := "http_error"
+		if resp.StatusCode == 401 || resp.StatusCode == 403 {
+			errorType = "auth_error"
+		} else if resp.StatusCode >= 500 {
+			errorType = "server_error"
+		}
+		appMetrics.RecordBackendError(appMetrics.BackendPrometheus, errorType)
 	}
 
 	// Log response details

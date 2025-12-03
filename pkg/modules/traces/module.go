@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/server"
+	appMetrics "github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 	"go.uber.org/zap"
 )
 
@@ -192,30 +193,34 @@ func (m *Module) BuildTools(toolsConfig JaegerToolsConfig) []server.ServerTool {
 	var tools []server.ServerTool
 
 	if toolsConfig.GetServices.Enabled {
+		toolName := m.BuildToolName(toolsConfig.GetServices.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildGetServicesToolDefinition(toolsConfig.GetServices),
-			Handler: m.handleGetServices,
+			Handler: appMetrics.WrapToolHandler(m.handleGetServices, toolName, "traces"),
 		})
 	}
 
 	if toolsConfig.GetOperations.Enabled {
+		toolName := m.BuildToolName(toolsConfig.GetOperations.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildGetOperationsToolDefinition(toolsConfig.GetOperations),
-			Handler: m.handleGetOperations,
+			Handler: appMetrics.WrapToolHandler(m.handleGetOperations, toolName, "traces"),
 		})
 	}
 
 	if toolsConfig.GetTrace.Enabled {
+		toolName := m.BuildToolName(toolsConfig.GetTrace.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildGetTraceToolDefinition(toolsConfig.GetTrace),
-			Handler: m.handleGetTrace,
+			Handler: appMetrics.WrapToolHandler(m.handleGetTrace, toolName, "traces"),
 		})
 	}
 
 	if toolsConfig.FindTraces.Enabled {
+		toolName := m.BuildToolName(toolsConfig.FindTraces.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildFindTracesToolDefinition(toolsConfig.FindTraces),
-			Handler: m.handleFindTraces,
+			Handler: appMetrics.WrapToolHandler(m.handleFindTraces, toolName, "traces"),
 		})
 	}
 

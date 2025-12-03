@@ -1,0 +1,439 @@
+{
+  "dashboard": {
+    "title": "Ops MCP Server Metrics",
+    "tags": ["ops-mcp-server", "mcp", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}} - {{status_code}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Duration (p95)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 3,
+        "title": "HTTP Requests In Flight",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "http_requests_in_flight",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Requests"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 4,
+        "title": "HTTP Status Code Distribution",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (status_code)",
+            "legendFormat": "{{status_code}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "SSE Active Connections",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 16, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sse_active_connections",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 6,
+        "title": "SSE Connection Rate",
+        "type": "graph",
+        "gridPos": {"x": 6, "y": 16, "w": 9, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(sse_connections_total[5m])",
+            "legendFormat": "Connections/sec",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Connections/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 7,
+        "title": "SSE Connection Duration",
+        "type": "graph",
+        "gridPos": {"x": 15, "y": 16, "w": 9, "h": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(sse_connection_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(sse_connection_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 8,
+        "title": "MCP Tool Calls Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(mcp_tool_calls_total[5m])",
+            "legendFormat": "{{tool_name}} ({{module}}) - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Calls/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 9,
+        "title": "MCP Tool Call Duration",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mcp_tool_call_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{tool_name}} ({{module}}) - p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(mcp_tool_call_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{tool_name}} ({{module}}) - p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 10,
+        "title": "MCP Tool Errors",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(mcp_tool_errors_total[5m])",
+            "legendFormat": "{{tool_name}} ({{module}}) - {{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Errors/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 11,
+        "title": "Module Requests",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(module_requests_total[5m])",
+            "legendFormat": "{{module_name}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 12,
+        "title": "Module Status",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 36, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "module_enabled",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "module_name": 0,
+                "Value": 1
+              },
+              "renameByName": {
+                "module_name": "Module",
+                "Value": "Enabled"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Backend Request Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 36, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(backend_requests_total[5m])",
+            "legendFormat": "{{backend}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 14,
+        "title": "Backend Request Duration",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 42, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(backend_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{backend}} - p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(backend_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{backend}} - p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 15,
+        "title": "Backend Errors",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 42, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(backend_errors_total[5m])",
+            "legendFormat": "{{backend}} - {{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Errors/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 16,
+        "title": "Auth Requests",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 50, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(auth_requests_total[5m])",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 17,
+        "title": "Auth Validation Duration",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 50, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(auth_token_validation_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(auth_token_validation_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 18,
+        "title": "Goroutines",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 56, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "process_goroutines",
+            "legendFormat": "Goroutines",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Count"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 19,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"x": 8, "y": 56, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "process_memory_bytes",
+            "legendFormat": "{{type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Bytes"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time", "show": true}
+      },
+      {
+        "id": 20,
+        "title": "Build Info",
+        "type": "table",
+        "gridPos": {"x": 16, "y": 56, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "build_info",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "version": 0,
+                "git_commit": 1,
+                "build_date": 2,
+                "Value": 3
+              },
+              "renameByName": {
+                "version": "Version",
+                "git_commit": "Git Commit",
+                "build_date": "Build Date",
+                "Value": "Enabled"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}
+

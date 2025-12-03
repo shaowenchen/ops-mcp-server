@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 )
 
 // ToolConfig defines configuration for a single tool
@@ -52,17 +53,19 @@ func (m *Module) BuildTools(toolsConfig EventsToolsConfig) []server.ServerTool {
 
 	// List Events Tool
 	if toolsConfig.ListEvents.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ListEvents.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildListEventsToolDefinition(toolsConfig.ListEvents),
-			Handler: m.handleListEvents,
+			Handler: metrics.WrapToolHandler(m.handleListEvents, toolName, "events"),
 		})
 	}
 
 	// Get Events Tool
 	if toolsConfig.GetEvents.Enabled {
+		toolName := m.BuildToolName(toolsConfig.GetEvents.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildGetEventsToolDefinition(toolsConfig.GetEvents),
-			Handler: m.handleGetEvents,
+			Handler: metrics.WrapToolHandler(m.handleGetEvents, toolName, "events"),
 		})
 	}
 

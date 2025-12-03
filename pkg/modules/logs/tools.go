@@ -3,6 +3,7 @@ package logs
 import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 )
 
 // ToolConfig defines configuration for a single tool
@@ -74,9 +75,10 @@ func (m *Module) BuildTools(toolsConfig LogsToolsConfig) []server.ServerTool {
 
 	// ES|QL Query Tool
 	if toolsConfig.ESQL.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ESQL.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildESQLToolDefinition(toolsConfig.ESQL),
-			Handler: m.handleESQL,
+			Handler: metrics.WrapToolHandler(m.handleESQL, toolName, "logs"),
 		})
 	}
 

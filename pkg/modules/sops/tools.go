@@ -3,6 +3,7 @@ package sops
 import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/shaowenchen/ops-mcp-server/pkg/metrics"
 )
 
 // ToolConfig defines configuration for a single tool
@@ -58,25 +59,28 @@ func (m *Module) BuildTools(toolsConfig SOPSToolsConfig) []server.ServerTool {
 
 	// Execute SOPS Tool
 	if toolsConfig.ExecuteSOPS.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ExecuteSOPS.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildExecuteSOPSToolDefinition(toolsConfig.ExecuteSOPS),
-			Handler: m.handleExecuteSOPS,
+			Handler: metrics.WrapToolHandler(m.handleExecuteSOPS, toolName, "sops"),
 		})
 	}
 
 	// List SOPS Tool
 	if toolsConfig.ListSOPS.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ListSOPS.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildListSOPSToolDefinition(toolsConfig.ListSOPS),
-			Handler: m.handleListSOPS,
+			Handler: metrics.WrapToolHandler(m.handleListSOPS, toolName, "sops"),
 		})
 	}
 
 	// List Parameters Tool
 	if toolsConfig.ListParameters.Enabled {
+		toolName := m.BuildToolName(toolsConfig.ListParameters.Name)
 		tools = append(tools, server.ServerTool{
 			Tool:    m.buildListParametersToolDefinition(toolsConfig.ListParameters),
-			Handler: m.handleListParameters,
+			Handler: metrics.WrapToolHandler(m.handleListParameters, toolName, "sops"),
 		})
 	}
 
