@@ -42,6 +42,9 @@ type Metrics struct {
 	ProcessGoroutines        prometheus.Gauge
 	ProcessMemoryBytes       *prometheus.GaugeVec
 
+	// Build info
+	BuildInfo                *prometheus.GaugeVec
+
 	logger *zap.Logger
 }
 
@@ -229,16 +232,14 @@ func Init(logger *zap.Logger) *Metrics {
 		[]string{"type"},
 	)
 
-	// Register build info
-	buildInfo := promauto.NewGaugeVec(
+	// Build info metric
+	m.BuildInfo = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "build_info",
 			Help: "Build information",
 		},
 		[]string{"version", "git_commit", "build_date"},
 	)
-	// This will be set by the application
-	_ = buildInfo
 
 	defaultMetrics = m
 	logger.Info("Metrics system initialized")
@@ -261,13 +262,9 @@ func (m *Metrics) SetModuleEnabled(moduleName string, enabled bool) {
 
 // SetBuildInfo sets the build information metric
 func SetBuildInfo(version, gitCommit, buildDate string) {
-	buildInfo := promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "build_info",
-			Help: "Build information",
-		},
-		[]string{"version", "git_commit", "build_date"},
-	)
-	buildInfo.WithLabelValues(version, gitCommit, buildDate).Set(1)
+	m := Get()
+	if m != nil && m.BuildInfo != nil {
+		m.BuildInfo.WithLabelValues(version, gitCommit, buildDate).Set(1)
+	}
 }
 
