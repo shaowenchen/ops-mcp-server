@@ -9,10 +9,20 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	opsv1 "github.com/shaowenchen/ops/api/v1"
 	"github.com/shaowenchen/ops/pkg/log"
-	"github.com/shaowenchen/ops/pkg/option"
 )
 
-var GlobalCopilotOption *option.CopilotOption
+var GlobalCopilotOption *CopilotOption
+
+type CopilotOption struct {
+	Endpoint     string
+	Model        string
+	Key          string
+	History      int
+	Silence      bool
+	OpsServer    string
+	OpsToken     string
+	RuntimeImage string
+}
 
 type RoleContent struct {
 	Role    string `json:"role"`

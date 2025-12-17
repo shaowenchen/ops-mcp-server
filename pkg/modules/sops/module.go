@@ -11,7 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	opsv1 "github.com/shaowenchen/ops/api/v1"
-	"github.com/shaowenchen/ops/pkg/copilot"
+	"github.com/shaowenchen/ops-copilot/pkg/copilot"
 	"github.com/shaowenchen/ops/pkg/log"
 	"go.uber.org/zap"
 )

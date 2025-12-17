@@ -166,10 +166,12 @@ github.com/sashabaranov/go-openai/jsonschema
 ## explicit; go 1.23.0
 github.com/shaowenchen/ops/api/v1
 github.com/shaowenchen/ops/pkg/constants
-github.com/shaowenchen/ops/pkg/copilot
 github.com/shaowenchen/ops/pkg/log
 github.com/shaowenchen/ops/pkg/option
 github.com/shaowenchen/ops/pkg/utils
+# github.com/shaowenchen/ops-copilot v0.0.0-20251217040405-62ef5ec860d2
+## explicit; go 1.24
+github.com/shaowenchen/ops-copilot/pkg/copilot
 # github.com/sourcegraph/conc v0.3.0
 ## explicit; go 1.19
 github.com/sourcegraph/conc

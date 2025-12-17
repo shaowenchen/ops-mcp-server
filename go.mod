@@ -6,6 +6,7 @@ require (
 	github.com/mark3labs/mcp-go v0.40.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/shaowenchen/ops v0.0.0-20250926063845-f45630dce302
+	github.com/shaowenchen/ops-copilot v0.0.0-20251217040405-62ef5ec860d2
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	go.opentelemetry.io/otel v1.38.0
