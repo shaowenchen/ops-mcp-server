@@ -40,7 +40,7 @@ func GetOsInfo() string {
 func GetCurrentUserHomeDir() string {
 	homeDirectory, err := os.UserHomeDir()
 	if err != nil {
-		return os.TempDir()
+		panic(err)
 	}
 	return homeDirectory
 }

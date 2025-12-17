@@ -99,7 +99,7 @@ func (f *FileOption) GetStorageType() string {
 	} else if remoteSplit[0] == "s3" {
 		f.StorageType = opsconstants.RemoteStorageTypeS3
 		f.RemoteFile = remoteSplit[1]
-	} else if len(remoteSplit) == 2 {
+	} else {
 		f.StorageType = opsconstants.RemoteStorageTypeImage
 		f.RuntimeImage = remoteSplit[0]
 		f.RemoteFile = remoteSplit[1]
@@ -132,7 +132,6 @@ type PrometheusOption struct {
 type ClusterOption struct {
 	Namespace  string
 	Name       string
-	Desc       string
 	Kubeconfig string
 	Clear      bool
 }

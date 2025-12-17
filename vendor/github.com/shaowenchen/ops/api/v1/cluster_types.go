@@ -43,7 +43,7 @@ type ClusterStatus struct {
 	Pod              int          `json:"pod,omitempty" yaml:"pod,omitempty"`
 	RunningPod       int          `json:"runningPod,omitempty" yaml:"runningPod,omitempty"`
 	HeartTime        *metav1.Time `json:"heartTime,omitempty" yaml:"heartTime,omitempty"`
-	HeartStatus      string       `json:"heartStatus,omitempty" yaml:"heartStatus,omitempty"`
+	HeartStatus      string       `json:"heartstatus,omitempty" yaml:"heartstatus,omitempty"`
 	CertNotAfterDays int          `json:"certNotAfterDays,omitempty" yaml:"certNotAfterDays,omitempty"`
 }
 
@@ -57,7 +57,7 @@ type ClusterStatus struct {
 // +kubebuilder:printcolumn:name="TotalPod",type=string,JSONPath=`.status.pod`
 // +kubebuilder:printcolumn:name="CertDays",type=string,JSONPath=`.status.certNotAfterDays`
 // +kubebuilder:printcolumn:name="HeartTime",type=date,JSONPath=`.status.heartTime`
-// +kubebuilder:printcolumn:name="HeartStatus",type=string,JSONPath=`.status.heartStatus`
+// +kubebuilder:printcolumn:name="HeartStatus",type=string,JSONPath=`.status.heartstatus`
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline" yaml:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
@@ -66,7 +66,7 @@ type Cluster struct {
 	Status ClusterStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
-func (c *Cluster) Cleaned() {
+func (c *Cluster) ClearSensitiveInfo() {
 	if c == nil {
 		return
 	}
@@ -88,10 +88,6 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 	return &c.Status
 }
 
-func (c *Cluster) IsHealthy() bool {
-	return c.Status.HeartStatus == opsconstants.StatusSuccessed
-}
-
 func (c *Cluster) GetUniqueKey() string {
 	return types.NamespacedName{
 		Namespace: c.Namespace,
@@ -111,14 +107,13 @@ func NewCurrentCluster() Cluster {
 	}
 }
 
-func NewCluster(namespace, name, desc, server, config, token string) *Cluster {
+func NewCluster(namespace, name, server, config, token string) *Cluster {
 	return &Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 		Spec: ClusterSpec{
-			Desc:   desc,
 			Server: server,
 			Config: config,
 			Token:  token,

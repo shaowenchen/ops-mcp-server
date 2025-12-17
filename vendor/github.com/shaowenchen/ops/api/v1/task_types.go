@@ -78,15 +78,6 @@ func (obj *Task) GetUniqueKey() string {
 	}.String()
 }
 
-func (obj *Task) OnlyScript() bool {
-	for _, step := range obj.Spec.Steps {
-		if step.LocalFile != "" || step.RemoteFile != "" {
-			return false
-		}
-	}
-	return true
-}
-
 func (obj *Task) CopyWithOutVersion() *Task {
 	return &Task{
 		ObjectMeta: metav1.ObjectMeta{

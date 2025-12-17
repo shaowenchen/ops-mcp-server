@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	"net/http"
 	"time"
@@ -32,14 +31,8 @@ func ShellIsInChina() string {
 	return `curl --connect-timeout 2 https://raw.githubusercontent.com/`
 }
 
-func ShellInstallManifests(proxy string) string {
-	proxy = formatProxy(proxy)
-	return fmt.Sprintf(`curl -sfL %s | VERSION=latest PROXY=%s sh -`, GetAvailableUrl("https://raw.githubusercontent.com/shaowenchen/ops/main/getmanifests.sh", proxy), proxy)
-}
-
 func ShellInstallOpscli(proxy string) string {
-	proxy = formatProxy(proxy)
-	return fmt.Sprintf(`curl -sfL %s | VERSION=latest PROXY=%s sh -`, GetAvailableUrl("https://raw.githubusercontent.com/shaowenchen/ops/main/getcli.sh", proxy), proxy)
+	return fmt.Sprintf(`curl %s | sh -`, GetAvailableUrl("https://raw.githubusercontent.com/shaowenchen/ops/main/getcli.sh", proxy))
 }
 
 func ShellAddHost(ip, domain string) string {
@@ -71,7 +64,7 @@ func ShellRm(dst string) string {
 }
 
 func ShellCPUTotal() string {
-	return `grep -c "processor" /proc/cpuinfo`
+	return `grep -c "model name" /proc/cpuinfo`
 }
 
 func ShellCPULoad1() string {
@@ -79,7 +72,7 @@ func ShellCPULoad1() string {
 }
 
 func ShellCPUUsagePercent() string {
-	return `grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf ("%.2f%%\n",usage)}'`
+	return `grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf ("%.2f%",usage)}'`
 }
 
 func ShellMemTotal() string {
@@ -91,11 +84,11 @@ func ShellMemUsagePercent() string {
 }
 
 func ShellDiskTotal(timeout int) string {
-	return fmt.Sprintf(`timeout %d df -H 2>/dev/null | grep "^/" | grep -v "/dev/loop" | grep -v "/boot" | grep -v "/dev/longhorn" | awk '{ print $5 " " $2 " " $1 }' | grep " "/ | awk '{ print $2 }' | tr '\n' ' '`, timeout)
+	return fmt.Sprintf(`timeout %d df -H 2>/dev/null | grep "^/" | grep -v "/dev/loop" | grep -v "/boot" | awk '{ print $5 " " $2 " " $1 }' | grep " "/ | awk '{ print $2 }' | tr '\n' ' '`, timeout)
 }
 
 func ShellDiskUsagePercent(timeout int) string {
-	return fmt.Sprintf(`timeout %d df -H 2>/dev/null | grep "^/" | grep -v "/dev/loop" | grep -v "/boot" | grep -v "/dev/longhorn" | awk '{ print $5 " " $2 " " $1 }' | grep " "/ | awk '{ print $1}' | tr '\n' ' '`, timeout)
+	return fmt.Sprintf(`timeout %d df -H 2>/dev/null | grep "^/" | grep -v "/dev/loop" | grep -v "/boot" | awk '{ print $5 " " $2 " " $1 }' | grep " "/ | awk '{ print $1}' | tr '\n' ' '`, timeout)
 }
 
 func ShellHostname() string {
@@ -126,7 +119,6 @@ func ShellAcceleratorCount() string {
 	return `(npu_count=$(npu-smi info -l 2>/dev/null | grep -o 'Total Count\s*:\s*[0-9]\+' | awk '{print $NF}' | sed 's/ //g'); [ -n "$npu_count" ] && echo "$npu_count") || (nvidia_count=$(nvidia-smi -L 2>/dev/null | wc -l | awk '{print $1}'); [ "$nvidia_count" -gt 0 ] && echo "$nvidia_count") || echo ""`
 }
 func GetAvailableUrl(url string, proxy string) string {
-	proxy = formatProxy(proxy)
 	if proxy != "" {
 		return proxy + url
 	}
@@ -138,11 +130,4 @@ func GetAvailableUrl(url string, proxy string) string {
 		url = proxy + url
 	}
 	return url
-}
-
-func formatProxy(proxy string) string {
-	if !strings.HasSuffix(proxy, "/") {
-		proxy = proxy + "/"
-	}
-	return proxy
 }

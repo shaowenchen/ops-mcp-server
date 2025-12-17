@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -141,14 +140,6 @@ func IsSucceededPod(pod *corev1.Pod) bool {
 	return false
 }
 
-func IsUnknownPod(pod *corev1.Pod) bool {
-	status := pod.Status.ContainerStatuses
-	if len(status) > 0 && status[0].State.Terminated != nil {
-		return status[0].State.Terminated.Reason == "Unknown"
-	}
-	return false
-}
-
 func IsFailedPod(pod *corev1.Pod) bool {
 	status := pod.Status.Phase
 	if status == corev1.PodFailed {
@@ -234,12 +225,13 @@ func GetAllReadyNodesByReconcileClient(client runtimeClient.Client) (nodes *core
 
 func GetAnyReadyNodesByReconcileClient(client runtimeClient.Client) (node *corev1.Node, err error) {
 	nodes, err := GetAllReadyNodesByReconcileClient(client)
-	if err != nil || len(nodes.Items) == 0 {
+	if err != nil {
 		return
 	}
-	// random select a ready node
-	random := rand.Intn(len(nodes.Items))
-	return &nodes.Items[random], nil
+	if len(nodes.Items) > 0 {
+		node = &nodes.Items[0]
+	}
+	return
 }
 
 func GetNodeByClient(client *kubernetes.Clientset, nodeName string) (node *corev1.Node, err error) {
