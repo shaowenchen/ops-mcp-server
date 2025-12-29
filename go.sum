@@ -156,8 +156,8 @@ github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6g
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sashabaranov/go-openai v1.32.2 h1:8z9PfYaLPbRzmJIYpwcWu6z3XU8F+RwVMF1QRSeSF2M=
 github.com/sashabaranov/go-openai v1.32.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
-github.com/shaowenchen/ops v0.0.0-20250926063845-f45630dce302 h1:Erab3gRTMeZcINn8VsqyO0YNF+p8ACz+OqOyzFzO+oY=
-github.com/shaowenchen/ops v0.0.0-20250926063845-f45630dce302/go.mod h1:B/dRXggjl5lEr5BIKdeXfSE9daEZvV89xhggjqQjpac=
+github.com/shaowenchen/ops v1.1.0 h1:hgrVPiI35sFSe0d6H4cMq7JzMgvqo2r7XKMSChBBFWQ=
+github.com/shaowenchen/ops v1.1.0/go.mod h1:F90fm67iuGalKsjqq+BY/lrducqpXQUUvL6oFNDdxO0=
 github.com/shaowenchen/ops-copilot v0.0.0-20251217040405-62ef5ec860d2 h1:/Tuw69pgTk9JpLXFqRg1MT7issbkd04IjQGmH3CKiJI=
 github.com/shaowenchen/ops-copilot v0.0.0-20251217040405-62ef5ec860d2/go.mod h1:2dfKmwNMzsKS4P0asnGQMRxaU8yf0HR/nPhpZuljpJs=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=

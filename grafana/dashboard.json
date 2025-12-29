@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3212,
+  "id": 3463,
   "links": [],
   "panels": [
     {
@@ -31,7 +31,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "📊 汇总状态",
+      "title": "Summary Status",
       "type": "row"
     },
     {
@@ -84,7 +84,7 @@
           "refId": "A"
         }
       ],
-      "title": "总请求速率 (req/s)",
+      "title": "Total Request Rate (req/s)",
       "type": "stat"
     },
     {
@@ -137,7 +137,7 @@
           "refId": "A"
         }
       ],
-      "title": "总工具调用速率 (calls/s)",
+      "title": "Total Tool Call Rate (calls/s)",
       "type": "stat"
     },
     {
@@ -190,7 +190,7 @@
           "refId": "A"
         }
       ],
-      "title": "活跃 SSE 连接数",
+      "title": "Active SSE Connections",
       "type": "stat"
     },
     {
@@ -247,7 +247,7 @@
           "refId": "A"
         }
       ],
-      "title": "工具错误速率 (errors/s)",
+      "title": "Tool Error Rate (errors/s)",
       "type": "stat"
     },
     {
@@ -260,7 +260,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "💻 Pod 资源使用",
+      "title": "Pod Resource Usage",
       "type": "row"
     },
     {
@@ -350,7 +350,7 @@
           "refId": "A"
         }
       ],
-      "title": "Goroutines 数量",
+      "title": "Goroutines Count",
       "type": "timeseries"
     },
     {
@@ -440,7 +440,7 @@
           "refId": "A"
         }
       ],
-      "title": "内存使用",
+      "title": "Memory Usage",
       "type": "timeseries"
     },
     {
@@ -562,7 +562,7 @@
           "refId": "B"
         }
       ],
-      "title": "CPU 使用量",
+      "title": "CPU Usage",
       "type": "timeseries"
     },
     {
@@ -658,7 +658,7 @@
           "refId": "B"
         }
       ],
-      "title": "网络 I/O",
+      "title": "Network I/O",
       "type": "timeseries"
     },
     {
@@ -671,7 +671,7 @@
       },
       "id": 300,
       "panels": [],
-      "title": "📈 Pod 吞吐量",
+      "title": "Pod Throughput",
       "type": "row"
     },
     {
@@ -762,7 +762,7 @@
           "refId": "A"
         }
       ],
-      "title": "HTTP 请求速率 (按 Pod)",
+      "title": "HTTP Request Rate (by Pod)",
       "type": "timeseries"
     },
     {
@@ -858,7 +858,7 @@
           "refId": "B"
         }
       ],
-      "title": "HTTP 请求延迟 (按 Pod)",
+      "title": "HTTP Request Latency (by Pod)",
       "type": "timeseries"
     },
     {
@@ -949,7 +949,7 @@
           "refId": "A"
         }
       ],
-      "title": "SSE 连接速率 (按 Pod)",
+      "title": "SSE Connection Rate (by Pod)",
       "type": "timeseries"
     },
     {
@@ -1040,7 +1040,7 @@
           "refId": "A"
         }
       ],
-      "title": "HTTP 请求进行中 (按 Pod)",
+      "title": "HTTP Requests In Progress (by Pod)",
       "type": "timeseries"
     },
     {
@@ -1053,7 +1053,7 @@
       },
       "id": 400,
       "panels": [],
-      "title": "🔧 MCP 工具详情",
+      "title": "MCP Tool Details",
       "type": "row"
     },
     {
@@ -1191,37 +1191,37 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
-          "expr": "sum(rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) by (tool_name, module, pod)",
+          "expr": "sum(rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) by (tool_name, module, pod)",
           "format": "table",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_sum{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) / sum(rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) by (tool_name, module, pod)",
+          "expr": "sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_sum{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) / sum(rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) by (tool_name, module, pod)",
           "format": "table",
           "instant": true,
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) by (tool_name, module, pod, le))",
+          "expr": "histogram_quantile(0.95, sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) by (tool_name, module, pod, le))",
           "format": "table",
           "instant": true,
           "refId": "C"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) by (tool_name, module, pod, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) by (tool_name, module, pod, le))",
           "format": "table",
           "instant": true,
           "refId": "D"
         },
         {
-          "expr": "sum(rate(ops_mcp_server_mcp_tool_errors_total{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])) by (tool_name, module, pod)",
+          "expr": "sum(rate(ops_mcp_server_mcp_tool_errors_total{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])) by (tool_name, module, pod)",
           "format": "table",
           "instant": true,
           "refId": "E"
         }
       ],
-      "title": "工具调用统计表",
+      "title": "Tool Call Statistics Table",
       "transformations": [
         {
           "id": "merge",
@@ -1249,14 +1249,14 @@
               "tool_name": 0
             },
             "renameByName": {
-              "Value #A": "调用速率",
-              "Value #B": "平均延迟",
-              "Value #C": "P95 延迟",
-              "Value #D": "P99 延迟",
-              "Value #E": "错误速率",
-              "module": "模块",
-              "pod": "Pod",
-              "tool_name": "工具名称"
+              "Value #A": "Call Rate",
+              "Value #B": "Avg Latency",
+              "Value #C": "P95 Latency",
+              "Value #D": "P99 Latency",
+              "Value #E": "Error Rate",
+              "module": "module",
+              "pod": "pod",
+              "tool_name": "tool"
             }
           }
         }
@@ -1346,12 +1346,12 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
-          "expr": "rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])",
+          "expr": "rate(ops_mcp_server_mcp_tool_calls_total{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])",
           "legendFormat": "{{tool_name}} ({{module}}) - {{pod}}",
           "refId": "A"
         }
       ],
-      "title": "工具调用速率趋势",
+      "title": "Tool Call Rate Trend",
       "type": "timeseries"
     },
     {
@@ -1437,17 +1437,17 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}]))",
+          "expr": "histogram_quantile(0.95, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}]))",
           "legendFormat": "{{tool_name}} ({{module}}) - p95",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}]))",
+          "expr": "histogram_quantile(0.99, rate(ops_mcp_server_mcp_tool_call_duration_seconds_bucket{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}]))",
           "legendFormat": "{{tool_name}} ({{module}}) - p99",
           "refId": "B"
         }
       ],
-      "title": "工具调用延迟趋势",
+      "title": "Tool Call Latency Trend",
       "type": "timeseries"
     },
     {
@@ -1537,12 +1537,12 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
-          "expr": "rate(ops_mcp_server_mcp_tool_errors_total{pod=~\"$pod\",tool_name=~\"$tool_name\",module=~\"$module_name\"}[${rate_interval}])",
+          "expr": "rate(ops_mcp_server_mcp_tool_errors_total{pod=~\"$pod\",tool_name=~\"$tool\",module=~\"$module\"}[${rate_interval}])",
           "legendFormat": "{{tool_name}} ({{module}}) - {{error_type}}",
           "refId": "A"
         }
       ],
-      "title": "工具错误趋势",
+      "title": "Tool Error Trend",
       "type": "timeseries"
     },
     {
@@ -1599,7 +1599,7 @@
           "refId": "A"
         }
       ],
-      "title": "模块状态",
+      "title": "Module Status",
       "transformations": [
         {
           "id": "organize",
@@ -1609,13 +1609,13 @@
             },
             "indexByName": {
               "Value": 1,
-              "module_name": 0,
+              "module": 0,
               "pod": 2
             },
             "renameByName": {
-              "Value": "启用",
-              "module_name": "模块名称",
-              "pod": "Pod"
+              "Value": "enabled",
+              "module": "module",
+              "pod": "pod"
             }
           }
         }
@@ -1636,11 +1636,11 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "",
-          "value": ""
+          "text": "Prometheus",
+          "value": "SHd-5-a7k"
         },
         "description": "datasource",
-        "label": "Data Source",
+        "label": "datasource",
         "name": "datasource",
         "options": [],
         "query": "prometheus",
@@ -1663,7 +1663,7 @@
         },
         "description": "pod",
         "includeAll": true,
-        "label": "Pod",
+        "label": "pod",
         "multi": true,
         "name": "pod",
         "options": [],
@@ -1678,19 +1678,76 @@
       },
       {
         "current": {
-          "text": "5m",
-          "value": "5m"
+          "text": [
+            "sops"
+          ],
+          "value": [
+            "sops"
+          ]
         },
-        "label": "Rate Interval",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "includeAll": true,
+        "label": "module",
+        "multi": true,
+        "name": "module",
+        "options": [],
+        "query": {
+          "query": "label_values(ops_mcp_server_mcp_tool_calls_total, module)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "includeAll": true,
+        "label": "tool",
+        "multi": true,
+        "name": "tool",
+        "options": [],
+        "query": {
+          "query": "label_values(ops_mcp_server_mcp_tool_calls_total, tool_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "30s",
+          "value": "30s"
+        },
+        "label": "rate_interval",
         "name": "rate_interval",
         "options": [
+          {
+            "selected": true,
+            "text": "30s",
+            "value": "30s"
+          },
           {
             "selected": false,
             "text": "1m",
             "value": "1m"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "5m",
             "value": "5m"
           },
@@ -1705,67 +1762,18 @@
             "value": "15m"
           }
         ],
-        "query": "1m,5m,10m,15m",
+        "query": "30s,1m,5m,10m,15m",
         "type": "interval"
-      },
-      {
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
-        },
-        "includeAll": true,
-        "label": "Tool Name",
-        "multi": true,
-        "name": "tool_name",
-        "options": [],
-        "query": {
-          "query": "label_values(ops_mcp_server_mcp_tool_calls_total, tool_name)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
-        },
-        "includeAll": true,
-        "label": "Module",
-        "multi": true,
-        "name": "module_name",
-        "options": [],
-        "query": {
-          "query": "label_values(ops_mcp_server_mcp_tool_calls_total, module)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "sort": 1,
-        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Ops MCP Server Metrics",
-  "uid": "ops-mcp-server-metrics"
+  "title": "ops-mcp-server",
+  "uid": "ops-mcp-server-metrics",
+  "version": 1
 }

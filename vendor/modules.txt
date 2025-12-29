@@ -161,9 +161,8 @@ github.com/sagikazarmark/slog-shim
 ## explicit; go 1.18
 github.com/sashabaranov/go-openai
 github.com/sashabaranov/go-openai/internal
-github.com/sashabaranov/go-openai/jsonschema
-# github.com/shaowenchen/ops v0.0.0-20250926063845-f45630dce302
-## explicit; go 1.23.0
+# github.com/shaowenchen/ops v1.1.0
+## explicit; go 1.24
 github.com/shaowenchen/ops/api/v1
 github.com/shaowenchen/ops/pkg/constants
 github.com/shaowenchen/ops/pkg/log

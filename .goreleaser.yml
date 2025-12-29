@@ -1,11 +1,16 @@
 project_name: ops-mcp-server
 before:
+  env:
+    - GOSUMDB=off
+    - GOPROXY=direct
   hooks:
+    - go mod download
     - go mod tidy
     - go mod vendor
 builds:
   - env:
       - CGO_ENABLED=0
+      - GOSUMDB=off
     main: ./cmd/server/main.go
     binary: ops-mcp-server
     goos:
@@ -19,6 +24,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
+      - -mod=vendor
     tags: containers_image_openpgp
     ldflags:
       - -X "github.com/shaowenchen/ops-mcp-server/cmd/version.BuildVersion={{ .Version }}"

@@ -39,6 +39,7 @@ jobs:
           push: true
           tags: docker.io/shaowenchen/ops-mcp-server:latest
           file: Dockerfile
+          no-cache: true
 
       - name: Push ops-mcp-server to aliyun
         run: |

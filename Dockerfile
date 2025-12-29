@@ -7,13 +7,16 @@ WORKDIR /builder
 COPY . .
 
 # Set Go environment variables for multi-arch builds
-ENV CGO_ENABLED=0
 ARG TARGETOS=linux
 ARG TARGETARCH
 ENV GOOS=${TARGETOS}
 ENV GOARCH=${TARGETARCH}
+ENV GOSUMDB=off
+ENV GOPROXY=direct
 
-# Build the application using vendor directory with multi-arch support
+# Build the application using the pre-vendored dependencies (no network)
+# Note: GOSUMDB=off disables checksum database lookup, but go.sum validation still occurs
+# If checksum mismatch occurs, update go.sum file before building
 RUN go mod tidy && go mod vendor && go build -mod=vendor -ldflags="-w -s" -o bin/ops-mcp-server cmd/server/main.go
 
 FROM shaowenchen/runtime-ubuntu:22.04
