@@ -1,8 +1,5 @@
 project_name: ops-mcp-server
 before:
-  env:
-    - GOSUMDB=off
-    - GOPROXY=direct
   hooks:
     - go mod download
     - go mod tidy
@@ -10,21 +7,22 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-      - GOSUMDB=off
     main: ./cmd/server/main.go
     binary: ops-mcp-server
     goos:
       - linux
       - darwin
+      - windows
     goarch:
+      - "386"
       - amd64
+      - arm
       - arm64
     goarm:
       - "7"
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-      - -mod=vendor
     tags: containers_image_openpgp
     ldflags:
       - -X "github.com/shaowenchen/ops-mcp-server/cmd/version.BuildVersion={{ .Version }}"
@@ -35,8 +33,5 @@ builds:
 dist: bin
 archives:
   - name_template: "ops-mcp-server-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
-    files:
-      - configs/
-      - deploy/
 changelog:
   skip: true
