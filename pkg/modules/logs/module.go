@@ -62,23 +62,14 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		timeout = time.Duration(config.Elasticsearch.Timeout) * time.Second
 	}
 
-	// Create HTTP client with optimized connection pooling and TIME_WAIT management
+	// Create HTTP client - each request uses a new connection, closes after request
 	transport := &http.Transport{
-		MaxIdleConns:        50,               // Reduce maximum idle connections
-		MaxIdleConnsPerHost: 5,                // Reduce idle connections per host
-		MaxConnsPerHost:     20,               // Reduce maximum connections per host
-		IdleConnTimeout:     30 * time.Second, // Significantly reduce idle connection timeout for faster release
+		DisableKeepAlives:     true, // Disable connection reuse - close after each request
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second, // Increase connection timeout
-			KeepAlive: 15 * time.Second, // Reduce keep-alive interval
+			Timeout: 30 * time.Second,
 		}).DialContext,
-		TLSHandshakeTimeout:   10 * time.Second, // Increase TLS handshake timeout
-		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     false, // Enable connection reuse
-		ForceAttemptHTTP2:     false, // Force HTTP/1.1 for better connection reuse
-		// Add connection cleanup mechanism
-		ResponseHeaderTimeout: timeout, // Use configured timeout for response headers
-		DisableCompression:    false,   // Enable compression to reduce transmission time
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: timeout,
 	}
 
 	m := &Module{
