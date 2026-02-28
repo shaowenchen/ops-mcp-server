@@ -238,6 +238,9 @@ func (m *Module) handleListParameters(ctx context.Context, request mcp.CallToolR
 			"required":    variable.Required,
 			"display":     variable.Display,
 		}
+		if variable.Value != "" {
+			param["value"] = variable.Value
+		}
 		if variable.Default != "" {
 			param["default"] = variable.Default
 		}
