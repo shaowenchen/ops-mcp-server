@@ -67,15 +67,15 @@ Call tools directly using mcporter command line:
 
 ```bash
 # List available tools
-mcporter list ops-mcp-server-mcp
+mcporter list ops-mcp-server
 
 # Call a tool (use key=value format for parameters)
-mcporter call ops-mcp-server-mcp <tool-name> param1=value1 param2=value2
+mcporter call ops-mcp-server <tool-name> param1=value1 param2=value2
 
 # Examples
-mcporter call ops-mcp-server-mcp list-events-from-ops
-mcporter call ops-mcp-server-mcp list-events-from-ops search=pod page_size=20
-mcporter call ops-mcp-server-mcp get-events-from-ops subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
+mcporter call ops-mcp-server list-events-from-ops
+mcporter call ops-mcp-server list-events-from-ops search=pod page_size=20
+mcporter call ops-mcp-server get-events-from-ops subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
 ```
 
 ## Parameter Formats

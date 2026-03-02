@@ -52,16 +52,16 @@ npm i -g mcporter
 
 # 2. Register the server
 cd ~/.openclaw/workspace
-mcporter config add ops-mcp-server-mcp --url http://localhost/mcp
+mcporter config add ops-mcp-server --url http://localhost/mcp
 
 # 3. Authenticate (if needed)
-mcporter auth ops-mcp-server-mcp
+mcporter auth ops-mcp-server
 # On failure, add to ~/.openclaw/workspace/config/mcporter.json:
 # "headers": { "Authorization": "Bearer YOUR_TOKEN" }
 
 # 4. Verify
-mcporter list ops-mcp-server-mcp
-mcporter call ops-mcp-server-mcp list-events-from-ops page_size=5
+mcporter list ops-mcp-server
+mcporter call ops-mcp-server list-events-from-ops page_size=5
 
 # 5. Set env var
 export OPS_MCP_SERVER_URL="http://localhost/mcp"

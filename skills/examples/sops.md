@@ -40,141 +40,160 @@ SOPS (Standard Operating Procedures) are predefined operational tasks that:
 
 ```bash
 # List all SOPS procedures
-mcporter call ops-mcp-server-mcp list-sops-from-ops
+mcporter call ops-mcp-server list-sops-from-ops
 ```
 
 ### Expected Response
 
 ```json
 {
-  "sops": [
+  "available_sops": [
     {
-      "id": "pod-restart",
-      "name": "Restart Pod",
-      "description": "Safely restart a pod in a namespace",
-      "category": "kubernetes"
+      "description": "",
+      "id": "clear-mount",
+      "variables": {
+        "cluster": {
+          "desc": "cluster"
+        },
+        "host": {
+          "desc": "host",
+          "required": true
+        }
+      }
     },
     {
-      "id": "scale-deployment",
-      "name": "Scale Deployment",
-      "description": "Scale deployment replicas",
-      "category": "kubernetes"
+      "description": "",
+      "id": "restart-kubelet-bypod",
+      "variables": {
+        "cluster": {
+          "desc": "cluster"
+        },
+        "host": {
+          "value": "anymaster",
+          "desc": "host",
+          "required": true
+        },
+        "namespace": {
+          "display": "namespace",
+          "required": true
+        },
+        "pod": {
+          "display": "pod name",
+          "required": true
+        },
+        "white": {
+          "display": "white",
+          "required": true
+        },
+        "whitelist": {
+          "display": "whitelist",
+          "required": true,
+          "examples": [
+            "white1,white2,white3"
+          ]
+        }
+      }
     },
     {
-      "id": "clear-cache",
-      "name": "Clear Cache",
-      "description": "Clear application cache",
-      "category": "maintenance"
+      "description": "restart node or host",
+      "id": "restart-node",
+      "variables": {
+        "cluster": {
+          "desc": "cluster"
+        },
+        "host": {
+          "desc": "host",
+          "required": true
+        },
+        "white": {
+          "required": true
+        }
+      }
+    },
+    {
+      "description": "",
+      "id": "list-clusters",
+      "variables": {
+        "cluster": {
+          "desc": "cluster"
+        },
+        "host": {
+          "value": "anymaster",
+          "desc": "host",
+          "required": true
+        },
+        "namespace": {
+          "default": "ops-system",
+          "display": "namespace",
+          "required": true
+        }
+      }
     }
-  ]
+  ],
+  "count": 18
 }
 ```
 
 ## Example 2: Get SOPS Parameters
 
 ```bash
-# Get parameters for pod-restart
-mcporter call ops-mcp-server-mcp list-sops-parameters-from-ops sops_id="pod-restart"
+# Get parameters for list-clusters
+mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="list-clusters"
 
-# Get parameters for scale-deployment
-mcporter call ops-mcp-server-mcp list-sops-parameters-from-ops sops_id="scale-deployment"
+# Get parameters for restart-kubelet-bypod
+mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="restart-kubelet-bypod"
 ```
 
 ### Expected Response
 
 ```json
 {
-  "sops_id": "pod-restart",
+  "count": 3,
   "parameters": [
     {
+      "description": "host",
+      "display": "",
+      "name": "host",
+      "required": true
+    },
+    {
+      "default": "ops-system",
+      "description": "",
+      "display": "namespace",
       "name": "namespace",
-      "type": "string",
-      "required": true,
-      "description": "Kubernetes namespace (e.g., kube-system)"
+      "required": true
     },
     {
-      "name": "pod_name",
-      "type": "string",
-      "required": true,
-      "description": "Name of the pod to restart (e.g., calico-node-abc123)"
-    },
-    {
-      "name": "force",
-      "type": "boolean",
-      "required": false,
-      "default": false,
-      "description": "Force restart even if unhealthy"
+      "description": "cluster",
+      "display": "",
+      "name": "cluster",
+      "required": false
     }
-  ]
+  ],
+  "sops_id": "list-clusters"
 }
 ```
 
 ## Example 3: Execute SOPS
 
 ```bash
-# Execute pod restart
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
-  sops_id="pod-restart" parameters='{"namespace":"kube-system","pod_name":"calico-node-abc123"}'
-
-# Scale deployment
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
-  sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":5}'
-
-# Clear cache
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
-  sops_id="clear-cache" parameters='{"environment":"kube-system","cache_type":"redis"}'
+# Execute list-clusters
+mcporter call ops-mcp-server execute-sops-from-ops \
+  sops_id="list-clusters" parameters='{"namespace":"ops-system","host":""}'
 ```
-
-## Parameters Format
-
-SOPS parameters must be a JSON string:
-
-```json
-// Simple parameters
-"{\"namespace\":\"kube-system\",\"pod_name\":\"calico-node-abc123\"}"
-
-// With optional parameters
-"{\"namespace\":\"kube-system\",\"pod_name\":\"coredns-123\",\"force\":true}"
-
-// Complex parameters
-"{\"namespace\":\"kube-system\",\"deployment\":\"coredns\",\"replicas\":5,\"wait_for_ready\":true,\"timeout\":\"5m\"}"
-
-// Nested parameters
-"{\"namespace\":\"kube-system\",\"service\":\"kube-dns\",\"config\":{\"memory_limit\":\"2Gi\",\"cpu_limit\":\"1000m\"}}"
-```
-
 ## Expected Response
 
 ### Execution Success
 
-```json
-{
-  "sops_id": "pod-restart",
-  "status": "success",
-  "execution_id": "exec-12345",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "result": {
-    "message": "Pod calico-node-abc123 restarted successfully",
-    "old_pod": "calico-node-abc123",
-    "new_pod": "calico-node-def456",
-    "restart_time": "2024-01-15T10:30:05Z"
-  }
-}
 ```
-
-### Execution Failure
-
-```json
-{
-  "sops_id": "pod-restart",
-  "status": "failed",
-  "execution_id": "exec-12346",
-  "timestamp": "2024-01-15T10:31:00Z",
-  "error": {
-    "code": "PERMISSION_DENIED",
-    "message": "Insufficient permissions to restart pod in kube-system namespace"
-  }
-}
+### Run Details
+#### list-clusters
+- Step: list-clusters
+- Output:
+NAME                            DESCRIPTION
+cluster1                        cluster1
+cluster2                        cluster2
+cluster3                        cluster3
 ```
 
 ## Troubleshooting
@@ -189,62 +208,19 @@ SOPS parameters must be a JSON string:
 2. Check SOPS ID spelling
 3. Verify SOPS module is enabled
 
-### Missing Required Parameters
-
-**Problem:** Execution fails due to missing parameters
-
-**Solutions:**
-
-1. Get parameter list: `list-sops-parameters-from-ops`
-2. Check all required parameters are provided
-3. Verify parameter names match exactly
-
-### Invalid Parameter Format
-
-**Problem:** JSON parse error
-
-**Solutions:**
-
-1. Ensure parameters is valid JSON string
-2. Escape quotes properly
-3. Use correct data types (string, number, boolean)
-
-```json
-// Correct
-"{\"namespace\":\"kube-system\",\"replicas\":5}"
-
-// Incorrect - missing quotes around JSON
-{namespace:kube-system,replicas:5}
-
-// Incorrect - wrong data type
-"{\"namespace\":\"kube-system\",\"replicas\":\"5\"}"
-```
-
-### Permission Denied
-
-**Problem:** Execution fails with permission error
-
-**Solutions:**
-
-1. Verify ops server authentication token
-2. Check RBAC permissions for the operation
-3. Ensure service account has necessary rights
-
-## Safety Best Practices
-
 ## Real-World Scenarios
 
 ### Scenario 1: Incident Response
 
 ```bash
 # Step 1: List available procedures
-mcporter call ops-mcp-server-mcp list-sops-from-ops
+mcporter call ops-mcp-server list-sops-from-ops
 
 # Step 2: Get parameters
-mcporter call ops-mcp-server-mcp list-sops-parameters-from-ops sops_id="pod-restart"
+mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="pod-restart"
 
 # Step 3: Execute
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="pod-restart" parameters='{"namespace":"kube-system","pod_name":"calico-node-abc123"}'
 ```
 
@@ -252,19 +228,19 @@ mcporter call ops-mcp-server-mcp execute-sops-from-ops \
 
 ```bash
 # Backup database
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="db-backup" parameters='{"database":"kube-system"}'
 
 # Scale down
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":0}'
 
 # Migrate database
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="db-migrate" parameters='{"database":"kube-system"}'
 
 # Scale up
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":3}'
 ```
 
@@ -272,11 +248,11 @@ mcporter call ops-mcp-server-mcp execute-sops-from-ops \
 
 ```bash
 # Scale up deployment
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":20}'
 
 # Increase resources
-mcporter call ops-mcp-server-mcp execute-sops-from-ops \
+mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="increase-resources" parameters='{"namespace":"kube-system","deployment":"coredns","cpu":"2000m","memory":"4Gi"}'
 ```
 
