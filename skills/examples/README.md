@@ -63,19 +63,19 @@ Each example file contains:
 
 ### Direct mcporter Calls
 
-Call tools directly using mcporter command line:
+Call tools directly using mcporter command line (using npx):
 
 ```bash
 # List available tools
-mcporter list ops-mcp-server
+npx mcporter list ops-mcp-server
 
 # Call a tool (use key=value format for parameters)
-mcporter call ops-mcp-server <tool-name> param1=value1 param2=value2
+npx mcporter call ops-mcp-server <tool-name> param1=value1 param2=value2
 
 # Examples
-mcporter call ops-mcp-server list-events-from-ops
-mcporter call ops-mcp-server list-events-from-ops search=pod page_size=20
-mcporter call ops-mcp-server get-events-from-ops subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
+npx mcporter call ops-mcp-server list-events-from-ops
+npx mcporter call ops-mcp-server list-events-from-ops search=pod page_size=20
+npx mcporter call ops-mcp-server get-events-from-ops subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
 ```
 
 ## Parameter Formats

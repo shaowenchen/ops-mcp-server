@@ -69,7 +69,7 @@ date -u -v-1H +"%Y-%m-%dT%H:%M:%SZ"
 
 ```bash
 # List all services
-mcporter call ops-mcp-server get-services-from-jaeger
+npx mcporter call ops-mcp-server get-services-from-jaeger
 ```
 
 ### Expected Response
@@ -90,10 +90,10 @@ mcporter call ops-mcp-server get-services-from-jaeger
 
 ```bash
 # Get all operations
-mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway"
 
 # Filter by span kind
-mcporter call ops-mcp-server get-operations-from-jaeger service="user-service" spanKind="server"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="user-service" spanKind="server"
 ```
 
 ### Span Kinds
@@ -110,15 +110,15 @@ mcporter call ops-mcp-server get-operations-from-jaeger service="user-service" s
 
 ```bash
 # Find recent traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 
 # Find slow traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" startTimeMin="2024-01-15T09:00:00Z" startTimeMax="2024-01-15T11:00:00Z" durationMin="1000"
 
 # Find traces for operation
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="checkout-service" operationName="POST /api/checkout" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z" searchDepth="100"
 ```
 
@@ -126,10 +126,10 @@ mcporter call ops-mcp-server find-traces-from-jaeger \
 
 ```bash
 # Get trace by ID
-mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
+npx mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
 
 # Get trace with time filter
-mcporter call ops-mcp-server get-trace-from-jaeger \
+npx mcporter call ops-mcp-server get-trace-from-jaeger \
   traceId="abc123def456789012345678901234" startTime="2024-01-15T10:00:00Z" endTime="2024-01-15T11:00:00Z"
 ```
 
@@ -143,7 +143,7 @@ mcporter call ops-mcp-server get-trace-from-jaeger \
 
 ```bash
 # Find slowest operations
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z" durationMin="1000" searchDepth="10"
 ```
 
@@ -278,13 +278,13 @@ Returns both Jaeger and OpenTelemetry formats:
 
 ```bash
 # Step 1: List services
-mcporter call ops-mcp-server get-services-from-jaeger
+npx mcporter call ops-mcp-server get-services-from-jaeger
 
 # Step 2: List operations
-mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway"
 
 # Step 3: Find traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" operationName="GET /api/users" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 ```
 
@@ -292,7 +292,7 @@ mcporter call ops-mcp-server find-traces-from-jaeger \
 
 ```bash
 # Good - specific time window
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 ```
 
@@ -300,7 +300,7 @@ mcporter call ops-mcp-server find-traces-from-jaeger \
 
 ```bash
 # Good - focus on slow traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" durationMin="1000" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 ```
 
@@ -308,7 +308,7 @@ mcporter call ops-mcp-server find-traces-from-jaeger \
 
 ```bash
 # Good - limited results
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" searchDepth="50" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 ```
 
@@ -318,36 +318,36 @@ mcporter call ops-mcp-server find-traces-from-jaeger \
 
 ```bash
 # Find slow traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" durationMin="2000" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 
 # Get details of specific trace
-mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
+npx mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
 ```
 
 ### Scenario 2: Debug Payment Failures
 
 ```bash
 # Find payment operations
-mcporter call ops-mcp-server get-operations-from-jaeger service="payment-service"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="payment-service"
 
 # Find failed traces
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="payment-service" startTimeMin="2024-01-14T10:00:00Z" startTimeMax="2024-01-15T10:00:00Z"
 
 # Analyze failure
-mcporter call ops-mcp-server get-trace-from-jaeger traceId="def789abc123456789012345678901234"
+npx mcporter call ops-mcp-server get-trace-from-jaeger traceId="def789abc123456789012345678901234"
 ```
 
 ### Scenario 3: Service Dependency Mapping
 
 ```bash
 # Find traces for api-gateway
-mcporter call ops-mcp-server find-traces-from-jaeger \
+npx mcporter call ops-mcp-server find-traces-from-jaeger \
   serviceName="api-gateway" startTimeMin="2024-01-15T10:00:00Z" startTimeMax="2024-01-15T11:00:00Z"
 
 # Analyze trace dependencies
-mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
+npx mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def456789012345678901234"
 ```
 
 ## Span Kind Usage
@@ -356,21 +356,21 @@ mcporter call ops-mcp-server get-trace-from-jaeger traceId="abc123def45678901234
 
 ```bash
 # HTTP endpoints, gRPC services
-mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway" spanKind="server"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway" spanKind="server"
 ```
 
 ### Client Spans
 
 ```bash
 # HTTP calls, database queries, external API calls
-mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway" spanKind="client"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="api-gateway" spanKind="client"
 ```
 
 ### Internal Spans
 
 ```bash
 # Business logic, algorithms, internal operations
-mcporter call ops-mcp-server get-operations-from-jaeger service="payment-service" spanKind="internal"
+npx mcporter call ops-mcp-server get-operations-from-jaeger service="payment-service" spanKind="internal"
 ```
 
 ## Reference

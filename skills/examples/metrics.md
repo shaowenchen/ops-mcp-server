@@ -29,38 +29,38 @@ Execute range PromQL query (values over time).
 
 ```bash
 # List all metrics
-mcporter call ops-mcp-server list-metrics-from-prometheus
+npx mcporter call ops-mcp-server list-metrics-from-prometheus
 
 # Search for specific metrics
-mcporter call ops-mcp-server list-metrics-from-prometheus search="cpu" limit="50"
+npx mcporter call ops-mcp-server list-metrics-from-prometheus search="cpu" limit="50"
 ```
 
 ## Example 2: Instant Queries (Current Values)
 
 ```bash
 # Simple metric query
-mcporter call ops-mcp-server query-metrics-from-prometheus query="up"
+npx mcporter call ops-mcp-server query-metrics-from-prometheus query="up"
 
 # Filtered query
-mcporter call ops-mcp-server query-metrics-from-prometheus query='up{job="kubernetes-nodes"}'
+npx mcporter call ops-mcp-server query-metrics-from-prometheus query='up{job="kubernetes-nodes"}'
 
 # Aggregated query
-mcporter call ops-mcp-server query-metrics-from-prometheus query="sum(node_memory_MemTotal_bytes)"
+npx mcporter call ops-mcp-server query-metrics-from-prometheus query="sum(node_memory_MemTotal_bytes)"
 ```
 
 ## Example 3: Range Queries (Values Over Time)
 
 ```bash
 # Query over time (default step)
-mcporter call ops-mcp-server query-metrics-range-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus \
   query="node_cpu_seconds_total" time_range="1h"
 
 # With custom step interval
-mcporter call ops-mcp-server query-metrics-range-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus \
   query="node_memory_MemAvailable_bytes" time_range="24h" step="5m"
 
 # Rate calculation
-mcporter call ops-mcp-server query-metrics-range-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus \
   query="rate(http_requests_total[5m])" time_range="30m" step="1m"
 ```
 
@@ -139,15 +139,15 @@ rate(http_requests_total[5m]) * 60
 
 ```bash
 # CPU usage
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query='100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance) * 100)'
 
 # Memory usage
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="container_memory_usage_bytes > 1073741824"
 
 # Disk usage
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="(node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 20"
 ```
 
@@ -155,15 +155,15 @@ mcporter call ops-mcp-server query-metrics-from-prometheus \
 
 ```bash
 # Request rate
-mcporter call ops-mcp-server query-metrics-range-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus \
   query="sum(rate(http_requests_total[5m])) by (service)" time_range="1h" step="1m"
 
 # Error rate
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query='sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100'
 
 # Latency
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
 ```
 
@@ -195,11 +195,11 @@ Same format as time range:
 
 ```bash
 # High CPU alert
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="100 - (avg(rate(container_cpu_usage_seconds_total[5m])) by (pod) * 100) > 90"
 
 # Memory growth trend
-mcporter call ops-mcp-server query-metrics-range-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus \
   query="sum(container_memory_usage_bytes) by (namespace)" time_range="7d" step="1h"
 ```
 
@@ -288,7 +288,7 @@ mcporter call ops-mcp-server query-metrics-range-from-prometheus \
 
 ```bash
 # Good - use rate for counter metrics
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="rate(http_requests_total[5m])"
 ```
 
@@ -296,7 +296,7 @@ mcporter call ops-mcp-server query-metrics-from-prometheus \
 
 ```bash
 # Good - aggregate by relevant label
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="sum(container_memory_usage_bytes) by (namespace)"
 ```
 
@@ -304,7 +304,7 @@ mcporter call ops-mcp-server query-metrics-from-prometheus \
 
 ```bash
 # Good - 5m is typical for rate calculations
-mcporter call ops-mcp-server query-metrics-from-prometheus \
+npx mcporter call ops-mcp-server query-metrics-from-prometheus \
   query="rate(http_requests_total[5m])"
 ```
 
@@ -312,10 +312,10 @@ mcporter call ops-mcp-server query-metrics-from-prometheus \
 
 ```bash
 # Instant query for current value
-mcporter call ops-mcp-server query-metrics-from-prometheus query="up"
+npx mcporter call ops-mcp-server query-metrics-from-prometheus query="up"
 
 # Range query for trend
-mcporter call ops-mcp-server query-metrics-range-from-prometheus query="up" time_range="1h"
+npx mcporter call ops-mcp-server query-metrics-range-from-prometheus query="up" time_range="1h"
 ```
 
 ## Reference

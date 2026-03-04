@@ -40,7 +40,7 @@ SOPS (Standard Operating Procedures) are predefined operational tasks that:
 
 ```bash
 # List all SOPS procedures
-mcporter call ops-mcp-server list-sops-from-ops
+npx mcporter call ops-mcp-server list-sops-from-ops
 ```
 
 ### Expected Response
@@ -138,10 +138,10 @@ mcporter call ops-mcp-server list-sops-from-ops
 
 ```bash
 # Get parameters for list-clusters
-mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="list-clusters"
+npx mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="list-clusters"
 
 # Get parameters for restart-kubelet-bypod
-mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="restart-kubelet-bypod"
+npx mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="restart-kubelet-bypod"
 ```
 
 ### Expected Response
@@ -178,7 +178,7 @@ mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="restart-kube
 
 ```bash
 # Execute list-clusters
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="list-clusters" parameters='{"namespace":"ops-system","host":""}'
 ```
 ## Expected Response
@@ -214,13 +214,13 @@ cluster3                        cluster3
 
 ```bash
 # Step 1: List available procedures
-mcporter call ops-mcp-server list-sops-from-ops
+npx mcporter call ops-mcp-server list-sops-from-ops
 
 # Step 2: Get parameters
-mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="pod-restart"
+npx mcporter call ops-mcp-server list-sops-parameters-from-ops sops_id="pod-restart"
 
 # Step 3: Execute
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="pod-restart" parameters='{"namespace":"kube-system","pod_name":"calico-node-abc123"}'
 ```
 
@@ -228,19 +228,19 @@ mcporter call ops-mcp-server execute-sops-from-ops \
 
 ```bash
 # Backup database
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="db-backup" parameters='{"database":"kube-system"}'
 
 # Scale down
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":0}'
 
 # Migrate database
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="db-migrate" parameters='{"database":"kube-system"}'
 
 # Scale up
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":3}'
 ```
 
@@ -248,11 +248,11 @@ mcporter call ops-mcp-server execute-sops-from-ops \
 
 ```bash
 # Scale up deployment
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="scale-deployment" parameters='{"namespace":"kube-system","deployment":"coredns","replicas":20}'
 
 # Increase resources
-mcporter call ops-mcp-server execute-sops-from-ops \
+npx mcporter call ops-mcp-server execute-sops-from-ops \
   sops_id="increase-resources" parameters='{"namespace":"kube-system","deployment":"coredns","cpu":"2000m","memory":"4Gi"}'
 ```
 

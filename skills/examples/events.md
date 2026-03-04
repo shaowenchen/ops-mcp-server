@@ -60,21 +60,21 @@ ops.notifications.providers.{provider}.channels.{channel}.severities.{severity}
 
 ```bash
 # List all event types
-mcporter call ops-mcp-server list-events-from-ops
+npx mcporter call ops-mcp-server list-events-from-ops
 
 # Search for specific events
-mcporter call ops-mcp-server list-events-from-ops search=pod page_size=20
+npx mcporter call ops-mcp-server list-events-from-ops search=pod page_size=20
 ```
 
 ## Example 2: Get Pod Events
 
 ```bash
 # Get pod events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events" start_time="1740672000000" page_size="10"
 
 # Simplified (without optional params)
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
 ```
 
@@ -98,7 +98,7 @@ ops.clusters.*.namespaces.*.pods.*.alerts
 
 ```bash
 # Get deployment events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.deployments.*.events"
 ```
 
@@ -106,7 +106,7 @@ mcporter call ops-mcp-server get-events-from-ops \
 
 ```bash
 # Get all node events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.cluster-1.nodes.*.events" start_time="1740672000000"
 ```
 
@@ -127,7 +127,7 @@ ops.clusters.*.nodes.*.alerts
 
 ```bash
 # Get critical notifications
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.notifications.providers.*.channels.*.severities.critical" start_time="1740585600000"
 ```
 
@@ -192,7 +192,7 @@ date -j -f "%Y-%m-%d %H:%M:%S" "2024-01-15 10:00:00" +%s000
 
 ```bash
 # Get pod events with pagination
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events" start_time="1740672000000" page="1" page_size="20"
 ```
 
@@ -262,14 +262,14 @@ mcporter call ops-mcp-server get-events-from-ops \
 
 ```bash
 # Step 1: List event types
-mcporter call ops-mcp-server list-events-from-ops search=pod
+npx mcporter call ops-mcp-server list-events-from-ops search=pod
 
 # Step 2: Get all pod events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
 
 # Step 3: Filter to specific pod
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.cluster-1.namespaces.kube-system.pods.calico-node-abc123.events"
 ```
 
@@ -277,11 +277,11 @@ mcporter call ops-mcp-server get-events-from-ops \
 
 ```bash
 # Good - limited time range
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events" start_time="1740672000000"
 
 # Avoid - no time limit
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events"
 ```
 
@@ -317,15 +317,15 @@ ops.clusters.*.namespaces.kube-system.pods.*.>
 
 ```bash
 # Step 1: Find pod events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.*.events" start_time="1740668400000"
 
 # Step 2: Get specific pod alerts
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.calico-node-abc123.alerts"
 
 # Step 3: Get all observations
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.calico-node-abc123.>"
 ```
 
@@ -333,15 +333,15 @@ mcporter call ops-mcp-server get-events-from-ops \
 
 ```bash
 # Monitor deployment events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.cluster-1.namespaces.kube-system.deployments.coredns.events"
 
 # Check pod events during rollout
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.coredns-*.events" start_time="1740671400000"
 
 # Verify no alerts
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.namespaces.kube-system.pods.coredns-*.alerts"
 ```
 
@@ -349,15 +349,15 @@ mcporter call ops-mcp-server get-events-from-ops \
 
 ```bash
 # Get node events
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.cluster-1.nodes.*.events" start_time="1740668400000"
 
 # Check for node alerts
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.*.nodes.*.alerts"
 
 # Specific node investigation
-mcporter call ops-mcp-server get-events-from-ops \
+npx mcporter call ops-mcp-server get-events-from-ops \
   subject_pattern="ops.clusters.cluster-1.nodes.worker-01.>"
 ```
 

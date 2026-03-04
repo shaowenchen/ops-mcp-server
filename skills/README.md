@@ -41,7 +41,7 @@ See [SKILL.md](SKILL.md) for installation and usage instructions.
 
 ## 🔧 Prerequisites
 
-- mcporter CLI (`npm i -g mcporter`)
+- mcporter CLI (use `npx mcporter` or install globally: `npm i -g mcporter`)
 - MCP server connection configured
 - Access to ops infrastructure endpoints
 

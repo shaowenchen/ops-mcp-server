@@ -1,0 +1,275 @@
+{
+    "service": "ops-mcp-server",
+    "version": "latest",
+    "total_tools": 15,
+    "enabled_modules": [
+        "sops",
+        "events",
+        "metrics",
+        "logs",
+        "traces"
+    ],
+    "tools": [
+        {
+            "name": "execute-sops-from-ops",
+            "description": "Execute a standard operation procedure (SOPS)",
+            "parameters": {
+                "parameters": {
+                    "description": "JSON string of parameters to pass to the SOPS procedure",
+                    "type": "string"
+                },
+                "sops_id": {
+                    "description": "ID of the SOPS procedure to execute",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "sops"
+        },
+        {
+            "name": "list-sops-from-ops",
+            "description": "List all available SOPS procedures",
+            "parameters": {},
+            "module": "sops"
+        },
+        {
+            "name": "list-sops-parameters-from-ops",
+            "description": "List all required parameters for a specific SOPS procedure",
+            "parameters": {
+                "sops_id": {
+                    "description": "ID of the SOPS procedure to get parameters for",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "sops"
+        },
+        {
+            "name": "list-events-from-ops",
+            "description": "List available event types by querying the backend API. Supports search filtering and pagination to discover different event categories and patterns.",
+            "parameters": {
+                "page": {
+                    "description": "Page number for pagination (default: 1)",
+                    "type": "string"
+                },
+                "page_size": {
+                    "description": "Number of event types to return (default: 10)",
+                    "type": "string"
+                },
+                "search": {
+                    "description": "Search term to filter event types (optional)",
+                    "type": "string"
+                }
+            },
+            "module": "events"
+        },
+        {
+            "name": "get-events-from-ops",
+            "description": "Get events using raw NATS subject patterns. Supports three query types: 1) Direct query (exact subject), 2) Wildcard query (using * for single level), 3) Prefix matching (using \u003e for multi-level suffix). Examples: 'ops.clusters.{cluster}.namespaces.{namespace}.pods.{pod-name}.event', 'ops.clusters.*.namespaces.ops-system.webhooks.*', 'ops.clusters.*.namespaces.{namespace}.hosts.\u003e'",
+            "parameters": {
+                "page": {
+                    "description": "Page number for pagination (default: 1)",
+                    "type": "string"
+                },
+                "page_size": {
+                    "description": "Number of events per page (default: 10)",
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "Start time for filtering events (timestamp, eg, 1758928888000)",
+                    "type": "string"
+                },
+                "subject_pattern": {
+                    "description": "NATS subject pattern for event querying (supports wildcards * and \u003e for flexible matching)",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "events"
+        },
+        {
+            "name": "list-metrics-from-prometheus",
+            "description": "List all available metrics from Prometheus. Returns metric names, types, and basic information.",
+            "parameters": {
+                "limit": {
+                    "description": "Maximum number of metrics to return (default: 100)",
+                    "type": "string"
+                },
+                "search": {
+                    "description": "Filter metrics by name pattern (optional)",
+                    "type": "string"
+                }
+            },
+            "module": "metrics"
+        },
+        {
+            "name": "query-metrics-from-prometheus",
+            "description": "Execute a custom PromQL instant query. Examples: 'up', 'cpu_usage_percent', 'sum(rate(ops_mcp_server_http_requests_total[5m]))'",
+            "parameters": {
+                "query": {
+                    "description": "PromQL query expression to execute",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "metrics"
+        },
+        {
+            "name": "query-metrics-range-from-prometheus",
+            "description": "Execute a custom PromQL range query over a time period. Examples: 'rate(cpu_usage[5m])', 'sum(memory_usage_bytes) by (pod)'",
+            "parameters": {
+                "query": {
+                    "description": "PromQL query expression to execute",
+                    "required": true,
+                    "type": "string"
+                },
+                "step": {
+                    "description": "Query resolution step (default: 15s, examples: 15s, 30s, 60s, 1m, 5m). Supports s(seconds), m(minutes), h(hours)",
+                    "type": "string"
+                },
+                "time_range": {
+                    "description": "Time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Supports s(seconds), m(minutes), h(hours), d(days)",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "metrics"
+        },
+        {
+            "name": "search-logs-from-elasticsearch",
+            "description": "Full-text search across log messages",
+            "parameters": {
+                "body": {
+                    "description": "Complete Elasticsearch query body as JSON string. Supports all ES Query DSL features: query, aggs, size, from, sort, _source, etc. Example: '{\"size\":0,\"query\":{\"query_string\":{\"query\":\"error\"}},\"aggs\":{\"by_level\":{\"terms\":{\"field\":\"level.keyword\"}}}}'",
+                    "required": true,
+                    "type": "string"
+                },
+                "index": {
+                    "description": "Index name or pattern to search (e.g., 'logs-*', 'filebeat-*')",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "logs"
+        },
+        {
+            "name": "list-log-indices-from-elasticsearch",
+            "description": "List all available log indices in Elasticsearch",
+            "parameters": {
+                "format": {
+                    "description": "Output format (table, json) - default: table",
+                    "type": "string"
+                },
+                "health": {
+                    "description": "Filter by health status (green, yellow, red)",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Filter by status (open, close)",
+                    "type": "string"
+                }
+            },
+            "module": "logs"
+        },
+        {
+            "name": "query-logs-from-elasticsearch",
+            "description": "Query logs using ES|QL (Elasticsearch Query Language)",
+            "parameters": {
+                "columnar": {
+                    "description": "Return results in columnar format (true or false) - default: false",
+                    "type": "string"
+                },
+                "format": {
+                    "description": "Response format (json, csv, tsv, txt) - default: json",
+                    "type": "string"
+                },
+                "query": {
+                    "description": "ES|QL query string. Example: 'FROM logs-* | WHERE @timestamp \u003e NOW() - 1 hour | STATS count() BY level'",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "logs"
+        },
+        {
+            "name": "get-services-from-jaeger",
+            "description": "Gets the service names as JSON array of string. No input parameter supported.",
+            "parameters": {},
+            "module": "traces"
+        },
+        {
+            "name": "get-operations-from-jaeger",
+            "description": "Gets the operations as JSON array of object with name and spanKind properties.",
+            "parameters": {
+                "service": {
+                    "description": "Filters operations by service name",
+                    "required": true,
+                    "type": "string"
+                },
+                "spanKind": {
+                    "description": "Filters operations by OpenTelemetry span kind (server, client, producer, consumer, internal)",
+                    "type": "string"
+                }
+            },
+            "module": "traces"
+        },
+        {
+            "name": "get-trace-from-jaeger",
+            "description": "Gets the spans by the given trace by ID. Returns both original Jaeger format and converted OpenTelemetry format with standardized trace/span IDs and attributes.",
+            "parameters": {
+                "endTime": {
+                    "description": "The end time to filter spans in the RFC 3339, section 5.6 format, (e.g., 2017-07-21T17:32:28Z)",
+                    "type": "string"
+                },
+                "startTime": {
+                    "description": "The start time to filter spans in the RFC 3339, section 5.6 format, (e.g., 2017-07-21T17:32:28Z)",
+                    "type": "string"
+                },
+                "traceId": {
+                    "description": "Filters spans by OpenTelemetry compatible trace id in 32-character hexadecimal string format",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "traces"
+        },
+        {
+            "name": "find-traces-from-jaeger",
+            "description": "Searches for traces based on criteria. Returns both original Jaeger format and converted OpenTelemetry format with standardized trace/span IDs and attributes.",
+            "parameters": {
+                "durationMax": {
+                    "description": "Maximum duration of a span in milliseconds",
+                    "type": "string"
+                },
+                "durationMin": {
+                    "description": "Minimum duration of a span in milliseconds",
+                    "type": "string"
+                },
+                "operationName": {
+                    "description": "The operation name to filter spans",
+                    "type": "string"
+                },
+                "searchDepth": {
+                    "description": "Defines the maximum search depth",
+                    "type": "string"
+                },
+                "serviceName": {
+                    "description": "Filters spans by service name",
+                    "required": true,
+                    "type": "string"
+                },
+                "startTimeMax": {
+                    "description": "End of the time interval (exclusive) in the RFC 3339, section 5.6 format",
+                    "required": true,
+                    "type": "string"
+                },
+                "startTimeMin": {
+                    "description": "Start of the time interval (inclusive) in the RFC 3339, section 5.6 format",
+                    "required": true,
+                    "type": "string"
+                }
+            },
+            "module": "traces"
+        }
+    ]
+}

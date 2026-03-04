@@ -37,24 +37,24 @@ Query logs using ES|QL (Elasticsearch Query Language).
 
 ```bash
 # List all indices
-mcporter call ops-mcp-server list-log-indices-from-elasticsearch
+npx mcporter call ops-mcp-server list-log-indices-from-elasticsearch
 
 # Filter by health status
-mcporter call ops-mcp-server list-log-indices-from-elasticsearch health="green" format="table"
+npx mcporter call ops-mcp-server list-log-indices-from-elasticsearch health="green" format="table"
 
 # Get open indices in JSON
-mcporter call ops-mcp-server list-log-indices-from-elasticsearch status="open" format="json"
+npx mcporter call ops-mcp-server list-log-indices-from-elasticsearch status="open" format="json"
 ```
 
 ## Example 2: Simple Text Search (Query DSL)
 
 ```bash
 # Simple search
-mcporter call ops-mcp-server search-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server search-logs-from-elasticsearch \
   index="logs-*" body='{"query":{"match":{"message":"error"}}}'
 
 # Search with time filter
-mcporter call ops-mcp-server search-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server search-logs-from-elasticsearch \
   index="logs-app-*" body='{"query":{"bool":{"must":[{"match":{"message":"timeout"}}],"filter":[{"range":{"@timestamp":{"gte":"now-1h"}}}]}}}'
 ```
 
@@ -64,15 +64,15 @@ ES|QL is the new query language (ES 8.11+) - simpler and more powerful.
 
 ```bash
 # Basic ES|QL query
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 1 hour | LIMIT 10"
 
 # Aggregation query
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE level == 'error' | STATS count() BY message | SORT count DESC | LIMIT 10"
 
 # With format option
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE service == 'api-gateway' AND level IN ('error', 'fatal')" format="json"
 ```
 
@@ -128,11 +128,11 @@ STATS count() BY bucket(@timestamp, 1 hour)
 
 ```bash
 # Multi-field search
-mcporter call ops-mcp-server search-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server search-logs-from-elasticsearch \
   index="logs-*" body='{"query":{"multi_match":{"query":"database connection","fields":["message","error"]}}}'
 
 # Aggregation query
-mcporter call ops-mcp-server search-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server search-logs-from-elasticsearch \
   index="logs-*" body='{"size":0,"query":{"match_all":{}},"aggs":{"by_level":{"terms":{"field":"level.keyword"}}}}'
 ```
 
@@ -170,27 +170,27 @@ mcporter call ops-mcp-server search-logs-from-elasticsearch \
 
 ```bash
 # Last 30 minutes
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 30 minutes"
 
 # Count by service
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | STATS count() BY service | SORT count DESC"
 
 # Error count by hour
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE level == 'error' | STATS count() BY bucket(@timestamp, 1 hour)"
 
 # Top error messages
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE level == 'error' | STATS count() BY message | SORT count DESC | LIMIT 10"
 
 # Structured field search
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE http.status_code >= 500 AND http.status_code < 600"
 
 # Trace correlation
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE trace_id == 'abc123def456' | SORT @timestamp ASC | KEEP @timestamp, service, message, span_id"
 ```
 
@@ -275,7 +275,7 @@ ES|QL is simpler and more readable than Query DSL.
 
 ```bash
 # Good - limited time range
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 1 hour"
 ```
 
@@ -283,7 +283,7 @@ mcporter call ops-mcp-server query-logs-from-elasticsearch \
 
 ```bash
 # Good - limited results
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE level == 'error' | LIMIT 100"
 ```
 
@@ -291,7 +291,7 @@ mcporter call ops-mcp-server query-logs-from-elasticsearch \
 
 ```bash
 # Good - specific pattern
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-app-2024.01.* | LIMIT 10"
 ```
 
@@ -299,7 +299,7 @@ mcporter call ops-mcp-server query-logs-from-elasticsearch \
 
 ```bash
 # Good - uses indexed field
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE http.status_code == 500"
 ```
 
@@ -308,28 +308,28 @@ mcporter call ops-mcp-server query-logs-from-elasticsearch \
 ### Find Errors
 
 ```bash
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 1 hour | WHERE level IN ('error', 'fatal', 'critical') | SORT @timestamp DESC | LIMIT 50"
 ```
 
 ### Top Error Messages
 
 ```bash
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 24 hours | WHERE level == 'error' | STATS count() BY message | SORT count DESC | LIMIT 10"
 ```
 
 ### Service Health
 
 ```bash
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE @timestamp > NOW() - 1 hour | STATS total = count(), errors = count(level == 'error') BY service"
 ```
 
 ### Request Timeline
 
 ```bash
-mcporter call ops-mcp-server query-logs-from-elasticsearch \
+npx mcporter call ops-mcp-server query-logs-from-elasticsearch \
   query="FROM logs-* | WHERE trace_id == 'abc123def456' | SORT @timestamp ASC | KEEP @timestamp, service, message, duration"
 ```
 

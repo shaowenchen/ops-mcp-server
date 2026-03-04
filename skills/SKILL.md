@@ -47,21 +47,21 @@ Access your infrastructure's observability data and execute operational procedur
 ## Setup (first-time)
 
 ```bash
-# 1. Install mcporter
-npm i -g mcporter
+# 1. Use mcporter with npx (no installation needed)
+# Or install globally: npm i -g mcporter
 
 # 2. Register the server
 cd ~/.openclaw/workspace
-mcporter config add ops-mcp-server --url http://localhost/mcp
+npx mcporter config add ops-mcp-server --url http://localhost/mcp
 
 # 3. Authenticate (if needed)
-mcporter auth ops-mcp-server
+npx mcporter auth ops-mcp-server
 # On failure, add to ~/.openclaw/workspace/config/mcporter.json:
 # "headers": { "Authorization": "Bearer YOUR_TOKEN" }
 
 # 4. Verify
-mcporter list ops-mcp-server
-mcporter call ops-mcp-server list-events-from-ops page_size=5
+npx mcporter list ops-mcp-server
+npx mcporter call ops-mcp-server list-events-from-ops page_size=5
 
 # 5. Set env var
 export OPS_MCP_SERVER_URL="http://localhost/mcp"
