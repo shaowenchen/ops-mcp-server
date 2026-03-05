@@ -49,7 +49,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		sops:   make(map[string]*SOPSConfig),
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   15 * time.Second, // Reduce client timeout for faster connection release
+			Timeout:   120 * time.Second, // SOPS operations may take longer
 		},
 	}
 

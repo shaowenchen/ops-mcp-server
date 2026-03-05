@@ -92,7 +92,7 @@ metrics:
     username: ""    # Optional: Basic auth username
     password: ""    # Optional: Basic auth password
     token: ""       # Optional: Bearer token
-    timeout: 30
+    timeout: 30     # Timeout in seconds (default: 30)
 
 logs:
   enabled: false
@@ -106,7 +106,7 @@ logs:
     username: ""    # Optional: Basic auth username
     password: ""    # Optional: Basic auth password
     api_key: ""     # Optional: Elasticsearch API key
-    timeout: 30
+    timeout: 120    # Timeout in seconds (default: 120)
 
 traces:
   enabled: false
@@ -115,7 +115,7 @@ traces:
     suffix: "-from-jaeger"
   jaeger:
     endpoint: "https://jaeger.your-company.com"
-    timeout: 30
+    timeout: 120    # Timeout in seconds (default: 120)
 ```
 
 ### Environment Variables

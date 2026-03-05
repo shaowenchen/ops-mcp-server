@@ -68,7 +68,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		logger: logger.Named("metrics"),
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   15 * time.Second, // Reduce client timeout for faster connection release
+			Timeout:   30 * time.Second, // Prometheus queries timeout
 		},
 	}
 

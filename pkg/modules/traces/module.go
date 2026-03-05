@@ -75,7 +75,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 	}
 
 	// Set default timeout if not specified
-	timeout := 15 * time.Second
+	timeout := 120 * time.Second
 	if config.Timeout > 0 {
 		timeout = time.Duration(config.Timeout) * time.Second
 	}
