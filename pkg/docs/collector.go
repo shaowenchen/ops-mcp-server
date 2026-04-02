@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/mark3labs/mcp-go/mcp"
+
 	"github.com/shaowenchen/ops-mcp-server/cmd/version"
 	"github.com/shaowenchen/ops-mcp-server/pkg/config"
 	eventsModule "github.com/shaowenchen/ops-mcp-server/pkg/modules/events"
@@ -111,7 +113,7 @@ func (c *Collector) collectSOPSTools() []ToolInfo {
 		toolInfo := ToolInfo{
 			Name:        serverTool.Tool.Name,
 			Description: serverTool.Tool.Description,
-			Parameters:  convertToolParameters(serverTool.Tool.InputSchema),
+			Parameters:  convertToolParameters(extractInputSchemaMap(serverTool.Tool)),
 			Module:      "sops",
 		}
 		tools = append(tools, toolInfo)
@@ -147,7 +149,7 @@ func (c *Collector) collectEventsTools() []ToolInfo {
 		toolInfo := ToolInfo{
 			Name:        serverTool.Tool.Name,
 			Description: serverTool.Tool.Description,
-			Parameters:  convertToolParameters(serverTool.Tool.InputSchema),
+			Parameters:  convertToolParameters(extractInputSchemaMap(serverTool.Tool)),
 			Module:      "events",
 		}
 		tools = append(tools, toolInfo)
@@ -183,7 +185,7 @@ func (c *Collector) collectMetricsTools() []ToolInfo {
 		toolInfo := ToolInfo{
 			Name:        serverTool.Tool.Name,
 			Description: serverTool.Tool.Description,
-			Parameters:  convertToolParameters(serverTool.Tool.InputSchema),
+			Parameters:  convertToolParameters(extractInputSchemaMap(serverTool.Tool)),
 			Module:      "metrics",
 		}
 		tools = append(tools, toolInfo)
@@ -223,7 +225,7 @@ func (c *Collector) collectLogsTools() []ToolInfo {
 		toolInfo := ToolInfo{
 			Name:        serverTool.Tool.Name,
 			Description: serverTool.Tool.Description,
-			Parameters:  convertToolParameters(serverTool.Tool.InputSchema),
+			Parameters:  convertToolParameters(extractInputSchemaMap(serverTool.Tool)),
 			Module:      "logs",
 		}
 		tools = append(tools, toolInfo)
@@ -260,13 +262,24 @@ func (c *Collector) collectTracesTools() []ToolInfo {
 		toolInfo := ToolInfo{
 			Name:        serverTool.Tool.Name,
 			Description: serverTool.Tool.Description,
-			Parameters:  convertToolParameters(serverTool.Tool.InputSchema),
+			Parameters:  convertToolParameters(extractInputSchemaMap(serverTool.Tool)),
 			Module:      "traces",
 		}
 		tools = append(tools, toolInfo)
 	}
 	
 	return tools
+}
+
+// extractInputSchemaMap prefers RawInputSchema when set (e.g. execute-sops flat args).
+func extractInputSchemaMap(t mcp.Tool) interface{} {
+	if len(t.RawInputSchema) > 0 {
+		var schema map[string]interface{}
+		if err := json.Unmarshal(t.RawInputSchema, &schema); err == nil {
+			return schema
+		}
+	}
+	return t.InputSchema
 }
 
 // convertToolParameters converts MCP tool input schema to a more readable format
@@ -311,6 +324,13 @@ func convertToolParameters(inputSchema interface{}) map[string]interface{} {
 					params[paramName] = paramInfo
 				}
 			}
+		}
+	}
+
+	if ap, exists := schemaMap["additionalProperties"]; exists {
+		params["_pipeline_variables"] = map[string]interface{}{
+			"description":          "Extra top-level keys are forwarded as pipeline variables; names match list-sops-parameters output.",
+			"additionalProperties": ap,
 		}
 	}
 	

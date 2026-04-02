@@ -16,6 +16,67 @@ import (
 	"go.uber.org/zap"
 )
 
+// parseSOPSParameters decodes the optional nested "parameters" argument (string, object, or RawMessage).
+func parseSOPSParameters(raw any) (map[string]interface{}, error) {
+	if raw == nil {
+		return make(map[string]interface{}), nil
+	}
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return make(map[string]interface{}), nil
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal([]byte(v), &m); err != nil {
+			return nil, fmt.Errorf("failed to parse parameters JSON: %w", err)
+		}
+		return m, nil
+	case map[string]interface{}:
+		return v, nil
+	case json.RawMessage:
+		if len(v) == 0 {
+			return make(map[string]interface{}), nil
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal(v, &m); err != nil {
+			return nil, fmt.Errorf("failed to parse parameters JSON: %w", err)
+		}
+		return m, nil
+	default:
+		data, err := json.Marshal(raw)
+		if err != nil {
+			return nil, fmt.Errorf("parameters must be a JSON string or object, got %T", raw)
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal(data, &m); err != nil {
+			return nil, fmt.Errorf("parameters must be a JSON object, got %T: %w", raw, err)
+		}
+		return m, nil
+	}
+}
+
+// collectExecuteSOPSVariables merges nested "parameters" (if present) with top-level keys.
+// Reserved: sops_id, parameters. Top-level values override the same key from nested parameters.
+func collectExecuteSOPSVariables(args map[string]any) (map[string]interface{}, error) {
+	out := make(map[string]interface{})
+	if raw, ok := args["parameters"]; ok && raw != nil {
+		parsed, err := parseSOPSParameters(raw)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range parsed {
+			out[k] = v
+		}
+	}
+	for k, v := range args {
+		if k == "sops_id" || k == "parameters" {
+			continue
+		}
+		out[k] = v
+	}
+	return out, nil
+}
+
 // Module represents the sops module
 type Module struct {
 	config     *Config
@@ -105,9 +166,12 @@ func (m *Module) handleExecuteSOPS(ctx context.Context, request mcp.CallToolRequ
 		return nil, fmt.Errorf("SOPS API endpoint not configured - please set sops.ops.endpoint in config")
 	}
 
-	args, ok := request.Params.Arguments.(map[string]interface{})
-	if !ok {
+	args := request.GetArguments()
+	if args == nil && request.Params.Arguments != nil {
 		return nil, fmt.Errorf("invalid arguments format")
+	}
+	if args == nil {
+		args = make(map[string]any)
 	}
 
 	sopsID, ok := args["sops_id"].(string)
@@ -126,14 +190,9 @@ func (m *Module) handleExecuteSOPS(ctx context.Context, request mcp.CallToolRequ
 		return nil, fmt.Errorf("SOPS with ID '%s' not found. Available SOPS IDs: %v", sopsID, availableIDs)
 	}
 
-	// Parse parameters
-	var parameters map[string]interface{}
-	if paramsStr, ok := args["parameters"].(string); ok && paramsStr != "" {
-		if err := json.Unmarshal([]byte(paramsStr), &parameters); err != nil {
-			return nil, fmt.Errorf("failed to parse parameters JSON: %w", err)
-		}
-	} else {
-		parameters = make(map[string]interface{})
+	parameters, err := collectExecuteSOPSVariables(args)
+	if err != nil {
+		return nil, err
 	}
 
 	// Execute SOPS

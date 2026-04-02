@@ -1,6 +1,8 @@
 package sops
 
 import (
+	"encoding/json"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/shaowenchen/ops-mcp-server/pkg/metrics"
@@ -87,12 +89,24 @@ func (m *Module) BuildTools(toolsConfig SOPSToolsConfig) []server.ServerTool {
 	return tools
 }
 
+// executeSOPSToolInputSchema: required sops_id; other keys are pipeline variables (additionalProperties).
+var executeSOPSToolInputSchema = json.RawMessage(`{
+	"type": "object",
+	"properties": {
+		"sops_id": {
+			"type": "string",
+			"description": "ID of the SOPS procedure to execute"
+		}
+	},
+	"required": ["sops_id"],
+	"additionalProperties": true
+}`)
+
 // Tool definition builder methods
 func (m *Module) buildExecuteSOPSToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
-		mcp.WithDescription(config.Description),
-		mcp.WithString("sops_id", mcp.Required(), mcp.Description("ID of the SOPS procedure to execute")),
-		mcp.WithString("parameters", mcp.Description("JSON string of parameters to pass to the SOPS procedure")),
+		mcp.WithDescription(config.Description+". Pipeline variables use the same names as list-sops-parameters, each as a top-level argument. Optional \"parameters\" (JSON string or object) is merged; top-level keys win on conflict."),
+		mcp.WithRawInputSchema(executeSOPSToolInputSchema),
 	)
 }
 

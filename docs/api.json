@@ -12,11 +12,11 @@
     "tools": [
         {
             "name": "execute-sops-from-ops",
-            "description": "Execute a standard operation procedure (SOPS)",
+            "description": "Execute a standard operation procedure (SOPS). Pipeline variables are top-level arguments (names from list-sops-parameters). Optional \"parameters\" merges; top-level keys win.",
             "parameters": {
-                "parameters": {
-                    "description": "JSON string of parameters to pass to the SOPS procedure",
-                    "type": "string"
+                "_pipeline_variables": {
+                    "additionalProperties": true,
+                    "description": "Extra top-level keys are pipeline variables; names match list-sops-parameters."
                 },
                 "sops_id": {
                     "description": "ID of the SOPS procedure to execute",
@@ -76,7 +76,7 @@
                     "type": "string"
                 },
                 "start_time": {
-                    "description": "Start time for filtering events (timestamp, eg, 1758928888000)",
+                    "description": "Start time for filtering events (Unix epoch milliseconds)",
                     "type": "string"
                 },
                 "subject_pattern": {

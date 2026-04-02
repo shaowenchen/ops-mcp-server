@@ -72,14 +72,25 @@ Execute a standard operation procedure (SOPS).
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `sops_id` | string | ✅ Yes | ID of the SOPS procedure to execute |
-| `parameters` | string | No | JSON string of parameters to pass to the SOPS procedure |
+| *(pipeline variables)* | string / number / boolean | No | Pass each variable as a **top-level** key (same names as `list-sops-parameters-from-ops`). |
+| `parameters` | string or object | No | Optional nested payload; merged with top-level keys, **top-level wins** on the same name. |
 
-**Example:**
+**Example (flat):**
 
 ```json
 {
-  "sops_id": "restart-nginx",
-  "parameters": "{\"environment\":\"production\",\"force\":\"true\"}"
+  "sops_id": "example-pipeline-a",
+  "environment": "staging",
+  "force": "false"
+}
+```
+
+**Optional nested `parameters` (merged with top-level; top-level wins):**
+
+```json
+{
+  "sops_id": "example-pipeline-a",
+  "parameters": "{\"environment\":\"staging\",\"force\":\"false\"}"
 }
 ```
 
@@ -93,14 +104,14 @@ Execute a standard operation procedure (SOPS).
 # Response shows:
 # {
 #   "available_sops": [
-#     {"id": "restart-nginx", "description": "Restart nginx service"}
+#     {"id": "example-pipeline-a", "description": "Example procedure A"}
 #   ]
 # }
 
 # Step 2: Check required parameters (REQUIRED before execution)
 # Tool: list-sops-parameters-from-ops
 {
-  "sops_id": "restart-nginx"
+  "sops_id": "example-pipeline-a"
 }
 
 # Response shows:
@@ -121,11 +132,12 @@ Execute a standard operation procedure (SOPS).
 #   ]
 # }
 
-# Step 3: Execute with correct parameters
+# Step 3: Execute with correct parameters (flat keys)
 # Tool: execute-sops-from-ops
 {
-  "sops_id": "restart-nginx",
-  "parameters": "{\"environment\":\"production\",\"force\":\"true\"}"
+  "sops_id": "example-pipeline-a",
+  "environment": "staging",
+  "force": "false"
 }
 ```
 
@@ -138,7 +150,7 @@ Execute a standard operation procedure (SOPS).
 **Response Example:**
 
 ```markdown
-# Pipeline Run: restart-nginx
+# Pipeline Run: example-pipeline-a
 Status: Success
 Duration: 45s
 ...
@@ -170,13 +182,13 @@ List all available SOPS procedures.
 {
   "available_sops": [
     {
-      "id": "restart-nginx",
-      "description": "Restart nginx service",
+      "id": "example-pipeline-a",
+      "description": "Example procedure A",
       "variables": {...}
     },
     {
-      "id": "deploy-app",
-      "description": "Deploy application to environment",
+      "id": "example-pipeline-b",
+      "description": "Example procedure B",
       "variables": {...}
     }
   ],
@@ -202,7 +214,7 @@ List all required parameters for a specific SOPS procedure.
 
 ```json
 {
-  "sops_id": "restart-nginx"
+  "sops_id": "example-pipeline-a"
 }
 ```
 
@@ -218,7 +230,7 @@ List all required parameters for a specific SOPS procedure.
 
 ```json
 {
-  "sops_id": "restart-nginx",
+  "sops_id": "example-pipeline-a",
   "parameters": [
     {
       "name": "environment",
@@ -226,14 +238,14 @@ List all required parameters for a specific SOPS procedure.
       "required": true,
       "display": "Environment",
       "enums": ["dev", "staging", "production"],
-      "examples": ["production"],
+      "examples": ["staging"],
       "value": ""  // Pre-filled value (if any)
     },
     {
       "name": "force",
-      "description": "Force restart without graceful shutdown",
+      "description": "Skip graceful shutdown when true",
       "required": false,
-      "display": "Force Restart",
+      "display": "Force",
       "default": "false",
       "value": "false"  // Pre-filled with default value
     },
@@ -255,7 +267,7 @@ List all required parameters for a specific SOPS procedure.
 
 | Field | Description | Usage |
 |-------|-------------|-------|
-| `name` | Parameter name | Use as key in parameters JSON |
+| `name` | Parameter name | Use as top-level argument key in `execute-sops-from-ops` (or inside optional nested `parameters`) |
 | `description` | Parameter description | Understand what the parameter does |
 | `required` | Is this parameter required? | Must provide if true |
 | `display` | Human-friendly display name | For UI display |
@@ -330,21 +342,21 @@ Get events using raw NATS subject patterns. Supports three query types:
 | `subject_pattern` | string | ✅ Yes | NATS subject pattern for event querying (supports wildcards `*` and `>`) |
 | `page` | string | No | Page number for pagination (default: 1) |
 | `page_size` | string | No | Number of events per page (default: 10) |
-| `start_time` | string | No | Start time for filtering events (timestamp, e.g., 1758928888000) |
+| `start_time` | string | No | Start time for filtering events (Unix epoch in milliseconds) |
 
 **Examples:**
 
 ```json
 // Direct query - exact subject
 {
-  "subject_pattern": "ops.clusters.prod-cluster.namespaces.default.pods.nginx-123.event",
+  "subject_pattern": "ops.clusters.example-cluster.namespaces.default.pods.example-pod.event",
   "page_size": "50"
 }
 
 // Wildcard query - single level wildcard
 {
   "subject_pattern": "ops.clusters.*.namespaces.ops-system.webhooks.*",
-  "start_time": "1758928888000"
+  "start_time": "1700000000000"
 }
 
 // Prefix matching - multi-level suffix
