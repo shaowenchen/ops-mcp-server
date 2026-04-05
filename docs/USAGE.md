@@ -5,9 +5,9 @@ This guide provides detailed usage instructions for all available MCP tools in t
 ## Table of Contents
 
 - [SOPS Module](#sops-module)
-  - [execute-sops-from-ops](#execute-sops-from-ops)
+  - [execute-sop-from-ops](#execute-sop-from-ops)
   - [list-sops-from-ops](#list-sops-from-ops)
-  - [list-sops-parameters-from-ops](#list-sops-parameters-from-ops)
+  - [get-sop-parameters-from-ops](#get-sop-parameters-from-ops)
 - [Events Module](#events-module)
   - [list-events-from-ops](#list-events-from-ops)
   - [get-events-from-ops](#get-events-from-ops)
@@ -31,7 +31,7 @@ This guide provides detailed usage instructions for all available MCP tools in t
 
 Standard Operating Procedures (SOPS) tools for executing operational procedures.
 
-> **⚠️ Important Workflow**: Always use `list-sops-parameters-from-ops` to check required parameters **before** executing a SOPS with `execute-sops-from-ops`. This ensures you provide all required parameters with correct values.
+> **⚠️ Important Workflow**: Always use `get-sop-parameters-from-ops` to check required parameters **before** executing a SOPS with `execute-sop-from-ops`. This ensures you provide all required parameters with correct values.
 
 ### Recommended Workflow
 
@@ -42,12 +42,12 @@ Standard Operating Procedures (SOPS) tools for executing operational procedures.
 │  1. list-sops-from-ops                                      │
 │     └─> Find available SOPS IDs                            │
 │                                                              │
-│  2. list-sops-parameters-from-ops  ⚠️ REQUIRED             │
+│  2. get-sop-parameters-from-ops  ⚠️ REQUIRED             │
 │     └─> Get parameter requirements                          │
 │     └─> Check: required, enums, regex, examples            │
 │     └─> Note: value, default fields                        │
 │                                                              │
-│  3. execute-sops-from-ops                                   │
+│  3. execute-sop-from-ops                                   │
 │     └─> Execute with validated parameters                   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -55,24 +55,24 @@ Standard Operating Procedures (SOPS) tools for executing operational procedures.
 **Step Details:**
 
 1. **Discover** available SOPS: `list-sops-from-ops` (optional, if you don't know the SOPS ID)
-2. **Check parameters** for a specific SOPS: `list-sops-parameters-from-ops` (**MANDATORY**)
+2. **Check parameters** for a specific SOPS: `get-sop-parameters-from-ops` (**MANDATORY**)
    - Shows required vs optional parameters
    - Reveals validation rules (`enums`, `regex`)
    - Provides examples and defaults
-3. **Execute** the SOPS with correct parameters: `execute-sops-from-ops`
+3. **Execute** the SOPS with correct parameters: `execute-sop-from-ops`
 
-### execute-sops-from-ops
+### execute-sop-from-ops
 
 Execute a standard operation procedure (SOPS).
 
-> **⚠️ Before executing**: Use `list-sops-parameters-from-ops` to view required parameters, their types, validation rules, and examples.
+> **⚠️ Before executing**: Use `get-sop-parameters-from-ops` to view required parameters, their types, validation rules, and examples.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `sops_id` | string | ✅ Yes | ID of the SOPS procedure to execute |
-| *(pipeline variables)* | string / number / boolean | No | Pass each variable as a **top-level** key (same names as `list-sops-parameters-from-ops`). |
+| *(pipeline variables)* | string / number / boolean | No | Pass each variable as a **top-level** key (same names as `get-sop-parameters-from-ops`). |
 | `parameters` | string or object | No | Optional nested payload; merged with top-level keys, **top-level wins** on the same name. |
 
 **Example (flat):**
@@ -109,7 +109,7 @@ Execute a standard operation procedure (SOPS).
 # }
 
 # Step 2: Check required parameters (REQUIRED before execution)
-# Tool: list-sops-parameters-from-ops
+# Tool: get-sop-parameters-from-ops
 {
   "sops_id": "example-pipeline-a"
 }
@@ -133,7 +133,7 @@ Execute a standard operation procedure (SOPS).
 # }
 
 # Step 3: Execute with correct parameters (flat keys)
-# Tool: execute-sops-from-ops
+# Tool: execute-sop-from-ops
 {
   "sops_id": "example-pipeline-a",
   "environment": "staging",
@@ -198,9 +198,9 @@ List all available SOPS procedures.
 
 ---
 
-### list-sops-parameters-from-ops
+### get-sop-parameters-from-ops
 
-List all required parameters for a specific SOPS procedure.
+Get the parameter schema for a specific SOPS procedure (required flags, types, enums, regex, examples).
 
 > **⚠️ REQUIRED STEP**: This tool MUST be called before executing any SOPS. It reveals all parameter requirements, validation rules, and examples needed for successful execution.
 
@@ -267,7 +267,7 @@ List all required parameters for a specific SOPS procedure.
 
 | Field | Description | Usage |
 |-------|-------------|-------|
-| `name` | Parameter name | Use as top-level argument key in `execute-sops-from-ops` (or inside optional nested `parameters`) |
+| `name` | Parameter name | Use as top-level argument key in `execute-sop-from-ops` |
 | `description` | Parameter description | Understand what the parameter does |
 | `required` | Is this parameter required? | Must provide if true |
 | `display` | Human-friendly display name | For UI display |
@@ -950,7 +950,7 @@ Searches for traces based on criteria. Returns both original Jaeger format and c
 ### General Guidelines
 
 1. **Start with list/discovery tools** before executing specific queries
-   - **SOPS**: Use `list-sops-from-ops` → `list-sops-parameters-from-ops` → `execute-sops-from-ops` (parameter check is mandatory!)
+   - **SOPS**: Use `list-sops-from-ops` → `get-sop-parameters-from-ops` → `execute-sop-from-ops` (parameter check is mandatory!)
    - **Metrics**: Use `list-metrics-from-prometheus` before querying specific metrics
    - **Traces**: Use `get-services-from-jaeger` before searching traces
 
@@ -970,7 +970,7 @@ Searches for traces based on criteria. Returns both original Jaeger format and c
 
 #### SOPS
 
-- **⚠️ CRITICAL**: ALWAYS use `list-sops-parameters-from-ops` to check parameters **before** executing any SOPS
+- **⚠️ CRITICAL**: ALWAYS use `get-sop-parameters-from-ops` to check parameters **before** executing any SOPS
   - This shows required vs optional parameters
   - Reveals validation rules (enums, regex patterns)
   - Provides examples and default values
@@ -1014,9 +1014,9 @@ Common error scenarios and solutions:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| SOPS execution failed | Missing required parameters or invalid values | **Always** use `list-sops-parameters-from-ops` first to check requirements |
+| SOPS execution failed | Missing required parameters or invalid values | **Always** use `get-sop-parameters-from-ops` first to check requirements |
 | SOPS not found | Invalid `sops_id` | Use `list-sops-from-ops` to list available SOPS IDs |
-| Parameter validation error | Value doesn't match required format | Check `enums`, `regex`, and `examples` from `list-sops-parameters-from-ops` |
+| Parameter validation error | Value doesn't match required format | Check `enums`, `regex`, and `examples` from `get-sop-parameters-from-ops` |
 | Missing required parameter | Required parameter not provided | Check tool definition and provide all required parameters |
 | Invalid time format | Incorrect timestamp or time range format | Use RFC 3339 format for timestamps, duration strings for ranges |
 | Index not found | Elasticsearch index doesn't exist | Use `list-log-indices-from-elasticsearch` to find available indices |

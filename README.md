@@ -22,9 +22,9 @@ Ops MCP Server enables AI assistants to query and interact with your observabili
 ## Available Tools
 
 ### SOPS Module
-- `execute-sops-from-ops` - Execute operational procedures
+- `execute-sop-from-ops` - Execute operational procedures
 - `list-sops-from-ops` - List available procedures
-- `list-sops-parameters-from-ops` - Get procedure parameters
+- `get-sop-parameters-from-ops` - Get procedure parameters
 
 ### Events Module
 - `get-events-from-ops` - Get Kubernetes events

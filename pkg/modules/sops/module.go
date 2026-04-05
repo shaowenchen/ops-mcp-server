@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -16,65 +18,90 @@ import (
 	"go.uber.org/zap"
 )
 
-// parseSOPSParameters decodes the optional nested "parameters" argument (string, object, or RawMessage).
-func parseSOPSParameters(raw any) (map[string]interface{}, error) {
-	if raw == nil {
-		return make(map[string]interface{}), nil
-	}
-	switch v := raw.(type) {
-	case string:
-		if v == "" {
-			return make(map[string]interface{}), nil
-		}
-		var m map[string]interface{}
-		if err := json.Unmarshal([]byte(v), &m); err != nil {
-			return nil, fmt.Errorf("failed to parse parameters JSON: %w", err)
-		}
-		return m, nil
-	case map[string]interface{}:
-		return v, nil
-	case json.RawMessage:
-		if len(v) == 0 {
-			return make(map[string]interface{}), nil
-		}
-		var m map[string]interface{}
-		if err := json.Unmarshal(v, &m); err != nil {
-			return nil, fmt.Errorf("failed to parse parameters JSON: %w", err)
-		}
-		return m, nil
-	default:
-		data, err := json.Marshal(raw)
-		if err != nil {
-			return nil, fmt.Errorf("parameters must be a JSON string or object, got %T", raw)
-		}
-		var m map[string]interface{}
-		if err := json.Unmarshal(data, &m); err != nil {
-			return nil, fmt.Errorf("parameters must be a JSON object, got %T: %w", raw, err)
-		}
-		return m, nil
-	}
-}
-
-// collectExecuteSOPSVariables merges nested "parameters" (if present) with top-level keys.
-// Reserved: sops_id, parameters. Top-level values override the same key from nested parameters.
-func collectExecuteSOPSVariables(args map[string]any) (map[string]interface{}, error) {
+// collectExecuteSOPSVariables builds pipeline variables from flat tool arguments only.
+// Reserved key: sops_id (not sent as a pipeline variable).
+func collectExecuteSOPSVariables(args map[string]any) map[string]interface{} {
 	out := make(map[string]interface{})
-	if raw, ok := args["parameters"]; ok && raw != nil {
-		parsed, err := parseSOPSParameters(raw)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range parsed {
-			out[k] = v
-		}
-	}
 	for k, v := range args {
-		if k == "sops_id" || k == "parameters" {
+		if k == "sops_id" {
 			continue
 		}
 		out[k] = v
 	}
-	return out, nil
+	return out
+}
+
+// decodePipelineListResponse accepts several Ops / Kubernetes-style list payloads.
+// ops-copilot only unmarshals data.list; many servers use data.items or a bare PipelineList.
+func decodePipelineListResponse(body []byte, log *zap.Logger) ([]opsv1.Pipeline, error) {
+	if len(body) < 2 {
+		return nil, fmt.Errorf("empty pipelines response body")
+	}
+
+	type nested struct {
+		List  []opsv1.Pipeline `json:"list"`
+		Items []opsv1.Pipeline `json:"items"`
+	}
+	var envelope struct {
+		Data   nested           `json:"data"`
+		Result nested           `json:"result"`
+		Items  []opsv1.Pipeline `json:"items"`
+	}
+
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("decode pipelines envelope: %w", err)
+	}
+
+	tryNested := func(n nested) []opsv1.Pipeline {
+		if len(n.List) > 0 {
+			return n.List
+		}
+		return n.Items
+	}
+
+	if p := tryNested(envelope.Data); len(p) > 0 {
+		return p, nil
+	}
+	if p := tryNested(envelope.Result); len(p) > 0 {
+		return p, nil
+	}
+	if len(envelope.Items) > 0 {
+		return envelope.Items, nil
+	}
+
+	// Root Kubernetes PipelineList { "items": [...] }
+	var pl opsv1.PipelineList
+	if err := json.Unmarshal(body, &pl); err == nil && len(pl.Items) > 0 {
+		return pl.Items, nil
+	}
+
+	// { "data": [ {...}, ... ] }
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err == nil {
+		if raw, ok := root["data"]; ok {
+			var asArr []opsv1.Pipeline
+			if err := json.Unmarshal(raw, &asArr); err == nil && len(asArr) > 0 {
+				return asArr, nil
+			}
+			var inner nested
+			if err := json.Unmarshal(raw, &inner); err == nil {
+				if p := tryNested(inner); len(p) > 0 {
+					return p, nil
+				}
+			}
+		}
+	}
+
+	if log != nil {
+		snippet := string(body)
+		if len(snippet) > 200 {
+			snippet = snippet[:200] + "..."
+		}
+		log.Debug("pipelines list parsed zero entries; check API response shape",
+			zap.Int("body_len", len(body)),
+			zap.String("body_snippet", snippet))
+	}
+	return nil, nil
 }
 
 // Module represents the sops module
@@ -137,25 +164,64 @@ func (m *Module) GetTools() []server.ServerTool {
 	return m.BuildTools(toolsConfig)
 }
 
-// loadSOPSConfigsFromAPI loads SOPS configurations from the API endpoint
-func (m *Module) loadSOPSConfigsFromAPI() error {
-	// Try to load SOPS configurations from API
-	pipelinerunsManager, err := copilot.NewPipelineRunsManager(m.config.Endpoint, m.config.Token, "ops-system")
+// fetchPipelinesFromOpsAPI lists pipelines using the same path as ops-copilot but tolerates
+// multiple JSON shapes (data.list vs data.items vs Kubernetes PipelineList).
+func (m *Module) fetchPipelinesFromOpsAPI(ctx context.Context) ([]opsv1.Pipeline, error) {
+	const uri = "/api/v1/namespaces/ops-system/pipelines?labels_selector=ops/copilot=enabled&page_size=999"
+	base := strings.TrimRight(m.config.Endpoint, "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+uri, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create pipeline runs manager: %w", err)
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+m.config.Token)
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("pipelines request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 512 {
+			snippet = snippet[:512] + "..."
+		}
+		return nil, fmt.Errorf("pipelines API returned HTTP %d: %s", resp.StatusCode, snippet)
 	}
 
-	pipelines, err := pipelinerunsManager.GetPipelines()
+	pl, err := decodePipelineListResponse(body, m.logger)
 	if err != nil {
-		return fmt.Errorf("failed to list pipelines: %w", err)
+		return nil, err
 	}
+	m.logger.Info("listed pipelines from Ops API", zap.Int("count", len(pl)))
+	return pl, nil
+}
+
+func (m *Module) rebuildSopsFromPipelines(pipelines []opsv1.Pipeline) {
+	next := make(map[string]*SOPSConfig, len(pipelines))
 	for _, pipeline := range pipelines {
-		m.sops[pipeline.Name] = &SOPSConfig{
+		if pipeline.Name == "" {
+			continue
+		}
+		next[pipeline.Name] = &SOPSConfig{
 			Desc:      pipeline.Spec.Desc,
 			Variables: pipeline.Spec.Variables,
 		}
 	}
+	m.sops = next
+}
 
+// loadSOPSConfigsFromAPI loads SOPS configurations from the API endpoint
+func (m *Module) loadSOPSConfigsFromAPI() error {
+	pipelines, err := m.fetchPipelinesFromOpsAPI(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to list pipelines: %w", err)
+	}
+	m.rebuildSopsFromPipelines(pipelines)
 	return nil
 }
 
@@ -190,10 +256,7 @@ func (m *Module) handleExecuteSOPS(ctx context.Context, request mcp.CallToolRequ
 		return nil, fmt.Errorf("SOPS with ID '%s' not found. Available SOPS IDs: %v", sopsID, availableIDs)
 	}
 
-	parameters, err := collectExecuteSOPSVariables(args)
-	if err != nil {
-		return nil, err
-	}
+	parameters := collectExecuteSOPSVariables(args)
 
 	// Execute SOPS
 	executionJSON, err := m.executeSOPS(ctx, sopsID, sops, parameters)
@@ -239,13 +302,22 @@ func (m *Module) handleListSOPS(ctx context.Context, request mcp.CallToolRequest
 		return nil, fmt.Errorf("SOPS API endpoint not configured - please set sops.ops.endpoint in config")
 	}
 
-	// Get all available SOPS IDs and their descriptions
-	sopsList := make([]map[string]interface{}, 0, len(m.sops))
-	for id, config := range m.sops {
+	// Refresh from API so the list matches the server (and uses the same decoding as load)
+	pipelines, err := m.fetchPipelinesFromOpsAPI(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m.rebuildSopsFromPipelines(pipelines)
+
+	sopsList := make([]map[string]interface{}, 0, len(pipelines))
+	for _, pipeline := range pipelines {
+		if pipeline.Name == "" {
+			continue
+		}
 		sopsList = append(sopsList, map[string]interface{}{
-			"id":          id,
-			"description": config.Desc,
-			"variables":   config.Variables,
+			"id":          pipeline.Name,
+			"description": pipeline.Spec.Desc,
+			"variables":   pipeline.Spec.Variables,
 		})
 	}
 
@@ -265,8 +337,8 @@ func (m *Module) handleListSOPS(ctx context.Context, request mcp.CallToolRequest
 	}, nil
 }
 
-// handleListParameters handles listing all required parameters for a specific SOPS
-func (m *Module) handleListParameters(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleGetSOPSParameters returns the parameter schema for a specific SOPS procedure.
+func (m *Module) handleGetSOPSParameters(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid arguments format")

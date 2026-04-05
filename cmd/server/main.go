@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/subosito/gotenv"
 	"go.uber.org/zap"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -242,6 +244,11 @@ func init() {
 }
 
 func initConfig() {
+	// Load optional .env from the current working directory (gitignored). Ignores missing file.
+	if err := gotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("Warning: could not load .env: %v", err)
+	}
+
 	// Set environment variable key mapping for nested config
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 

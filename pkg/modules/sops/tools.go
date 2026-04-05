@@ -18,15 +18,15 @@ type ToolConfig struct {
 // SOPSToolsConfig defines configuration for all tools
 type SOPSToolsConfig struct {
 	ExecuteSOPS    ToolConfig
-	ListSOPS       ToolConfig
-	ListParameters ToolConfig
+	ListSOPS        ToolConfig
+	GetParameters   ToolConfig
 }
 
 // GetDefaultToolsConfig returns default tool configuration
 func GetDefaultToolsConfig() SOPSToolsConfig {
 	return SOPSToolsConfig{
 		ExecuteSOPS: ToolConfig{
-			Name:        "execute-sops",
+			Name:        "execute-sop",
 			Description: "Execute a standard operation procedure (SOPS)",
 			Enabled:     true,
 		},
@@ -35,9 +35,9 @@ func GetDefaultToolsConfig() SOPSToolsConfig {
 			Description: "List all available SOPS procedures",
 			Enabled:     true,
 		},
-		ListParameters: ToolConfig{
-			Name:        "list-sops-parameters",
-			Description: "List all required parameters for a specific SOPS procedure",
+		GetParameters: ToolConfig{
+			Name:        "get-sop-parameters",
+			Description: "Get parameter schema for a specific SOPS procedure",
 			Enabled:     true,
 		},
 	}
@@ -77,12 +77,12 @@ func (m *Module) BuildTools(toolsConfig SOPSToolsConfig) []server.ServerTool {
 		})
 	}
 
-	// List Parameters Tool
-	if toolsConfig.ListParameters.Enabled {
-		toolName := m.BuildToolName(toolsConfig.ListParameters.Name)
+	// Get SOPS parameters tool
+	if toolsConfig.GetParameters.Enabled {
+		toolName := m.BuildToolName(toolsConfig.GetParameters.Name)
 		tools = append(tools, server.ServerTool{
-			Tool:    m.buildListParametersToolDefinition(toolsConfig.ListParameters),
-			Handler: metrics.WrapToolHandler(m.handleListParameters, toolName, "sops"),
+			Tool:    m.buildGetSOPSParametersToolDefinition(toolsConfig.GetParameters),
+			Handler: metrics.WrapToolHandler(m.handleGetSOPSParameters, toolName, "sops"),
 		})
 	}
 
@@ -104,10 +104,21 @@ var executeSOPSToolInputSchema = json.RawMessage(`{
 
 // Tool definition builder methods
 func (m *Module) buildExecuteSOPSToolDefinition(config ToolConfig) mcp.Tool {
-	return mcp.NewTool(m.BuildToolName(config.Name),
-		mcp.WithDescription(config.Description+". Pipeline variables use the same names as list-sops-parameters, each as a top-level argument. Optional \"parameters\" (JSON string or object) is merged; top-level keys win on conflict."),
-		mcp.WithRawInputSchema(executeSOPSToolInputSchema),
+	// NewTool always seeds InputSchema with type "object"; WithRawInputSchema does not
+	// clear it, which triggers MarshalJSON conflict (InputSchema + RawInputSchema).
+	tool := mcp.NewToolWithRawSchema(
+		m.BuildToolName(config.Name),
+		config.Description+". Pass pipeline variables as top-level arguments (same names as get-sop-parameters). Only sops_id is reserved.",
+		executeSOPSToolInputSchema,
 	)
+	// Match defaults from mcp.NewTool for consistent client hints.
+	tool.Annotations = mcp.ToolAnnotation{
+		ReadOnlyHint:    mcp.ToBoolPtr(false),
+		DestructiveHint: mcp.ToBoolPtr(true),
+		IdempotentHint:  mcp.ToBoolPtr(false),
+		OpenWorldHint:   mcp.ToBoolPtr(true),
+	}
+	return tool
 }
 
 func (m *Module) buildListSOPSToolDefinition(config ToolConfig) mcp.Tool {
@@ -116,7 +127,7 @@ func (m *Module) buildListSOPSToolDefinition(config ToolConfig) mcp.Tool {
 	)
 }
 
-func (m *Module) buildListParametersToolDefinition(config ToolConfig) mcp.Tool {
+func (m *Module) buildGetSOPSParametersToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("sops_id", mcp.Required(), mcp.Description("ID of the SOPS procedure to get parameters for")),

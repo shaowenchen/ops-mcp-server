@@ -271,7 +271,7 @@ func (c *Collector) collectTracesTools() []ToolInfo {
 	return tools
 }
 
-// extractInputSchemaMap prefers RawInputSchema when set (e.g. execute-sops flat args).
+// extractInputSchemaMap prefers RawInputSchema when set (e.g. execute-sop-from-ops flat args).
 func extractInputSchemaMap(t mcp.Tool) interface{} {
 	if len(t.RawInputSchema) > 0 {
 		var schema map[string]interface{}
@@ -329,7 +329,7 @@ func convertToolParameters(inputSchema interface{}) map[string]interface{} {
 
 	if ap, exists := schemaMap["additionalProperties"]; exists {
 		params["_pipeline_variables"] = map[string]interface{}{
-			"description":          "Extra top-level keys are forwarded as pipeline variables; names match list-sops-parameters output.",
+			"description":          "Extra top-level keys are forwarded as pipeline variables; names match get-sop-parameters output.",
 			"additionalProperties": ap,
 		}
 	}
