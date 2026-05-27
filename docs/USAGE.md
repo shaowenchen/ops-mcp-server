@@ -497,8 +497,12 @@ Execute a custom PromQL range query over a time period.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `query` | string | ✅ Yes | PromQL query expression to execute |
-| `time_range` | string | ✅ Yes | Time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d) |
+| `time_range` | string | No | Relative time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Optional when `start` and `end` are provided. |
+| `start` | string | No | Absolute start time. Must be used together with `end`. Supports RFC3339 or Unix timestamp seconds/milliseconds. |
+| `end` | string | No | Absolute end time. Must be used together with `start`. Supports RFC3339 or Unix timestamp seconds/milliseconds. |
 | `step` | string | No | Query resolution step (default: 15s, examples: 15s, 30s, 60s, 1m, 5m) |
+
+Provide either `time_range` or both `start` and `end`.
 
 **Examples:**
 
@@ -522,6 +526,14 @@ Execute a custom PromQL range query over a time period.
   "query": "rate(http_requests_total[5m])",
   "time_range": "7d",
   "step": "1h"
+}
+
+// Request rate over a specific absolute interval
+{
+  "query": "rate(http_requests_total[5m])",
+  "start": "2026-05-27T13:00:00+08:00",
+  "end": "2026-05-27T14:00:00+08:00",
+  "step": "1m"
 }
 ```
 

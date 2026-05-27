@@ -468,10 +468,9 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 		return nil, fmt.Errorf("query parameter is required")
 	}
 
-	timeRange, ok := args["time_range"].(string)
-	if !ok {
-		return nil, fmt.Errorf("time_range parameter is required")
-	}
+	timeRange, _ := args["time_range"].(string)
+	startArg, _ := args["start"].(string)
+	endArg, _ := args["end"].(string)
 
 	// Get step parameter or use default
 	step := "15s"
@@ -482,24 +481,24 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 	m.logger.Info("Executing PromQL range query",
 		zap.String("query", query),
 		zap.String("time_range", timeRange),
+		zap.String("start", startArg),
+		zap.String("end", endArg),
 		zap.String("step", step))
 
-	// Parse time range dynamically
-	duration, err := parseTimeRange(timeRange)
+	start, end, err := resolveRangeQueryWindow(timeRange, startArg, endArg)
 	if err != nil {
-		m.logger.Error("Failed to parse time_range",
+		m.logger.Error("Failed to resolve range query window",
 			zap.String("time_range", timeRange),
+			zap.String("start", startArg),
+			zap.String("end", endArg),
 			zap.Error(err))
-		return nil, fmt.Errorf("invalid time_range format '%s': %w (supported units: s, m, h, d - examples: 5m, 10m, 1h, 24h, 7d)", timeRange, err)
+		return nil, err
 	}
-
-	now := time.Now()
-	start := now.Add(-duration)
 
 	// Execute range query
 	params := make(map[string]string)
 	params["start"] = fmt.Sprintf("%d", start.Unix())
-	params["end"] = fmt.Sprintf("%d", now.Unix())
+	params["end"] = fmt.Sprintf("%d", end.Unix())
 	params["step"] = step
 
 	promResp, err := m.queryPrometheus(ctx, query, "query_range", params)
@@ -507,6 +506,8 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 		m.logger.Error("Failed to execute PromQL range query",
 			zap.String("query", query),
 			zap.String("time_range", timeRange),
+			zap.String("start", startArg),
+			zap.String("end", endArg),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to execute range query: %w", err)
 	}
@@ -522,7 +523,7 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 			"type":       "range",
 			"time_range": timeRange,
 			"start_time": start.Format(time.RFC3339),
-			"end_time":   now.Format(time.RFC3339),
+			"end_time":   end.Format(time.RFC3339),
 			"step":       step,
 		},
 	}
@@ -535,6 +536,8 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 	m.logger.Info("PromQL range query completed successfully",
 		zap.String("query", query),
 		zap.String("time_range", timeRange),
+		zap.String("start", start.Format(time.RFC3339)),
+		zap.String("end", end.Format(time.RFC3339)),
 		zap.String("status", promResp.Status))
 
 	return &mcp.CallToolResult{
@@ -545,6 +548,58 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 			},
 		},
 	}, nil
+}
+
+func resolveRangeQueryWindow(timeRange, startArg, endArg string) (time.Time, time.Time, error) {
+	if startArg != "" || endArg != "" {
+		if startArg == "" || endArg == "" {
+			return time.Time{}, time.Time{}, fmt.Errorf("start and end must be provided together")
+		}
+		start, err := parseQueryTime(startArg)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid start time %q: %w", startArg, err)
+		}
+		end, err := parseQueryTime(endArg)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid end time %q: %w", endArg, err)
+		}
+		if !end.After(start) {
+			return time.Time{}, time.Time{}, fmt.Errorf("end must be after start")
+		}
+		return start, end, nil
+	}
+
+	if timeRange == "" {
+		return time.Time{}, time.Time{}, fmt.Errorf("either time_range or both start and end are required")
+	}
+	duration, err := parseTimeRange(timeRange)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid time_range format %q: %w (supported units: s, m, h, d - examples: 5m, 10m, 1h, 24h, 7d)", timeRange, err)
+	}
+	end := time.Now()
+	return end.Add(-duration), end, nil
+}
+
+// parseQueryTime accepts RFC3339/RFC3339Nano strings or Unix timestamps in seconds/milliseconds.
+func parseQueryTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, fmt.Errorf("time cannot be empty")
+	}
+	if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t, nil
+	}
+	ts, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("expected RFC3339 or Unix timestamp: %w", err)
+	}
+	// Treat 13-digit timestamps as Unix milliseconds.
+	if ts > 1_000_000_000_000 {
+		return time.UnixMilli(ts), nil
+	}
+	return time.Unix(ts, 0), nil
 }
 
 // parseTimeRange parses a time range string supporting s, m, h, d units

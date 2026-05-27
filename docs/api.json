@@ -128,8 +128,15 @@
                     "type": "string"
                 },
                 "time_range": {
-                    "description": "Time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Supports s(seconds), m(minutes), h(hours), d(days)",
-                    "required": true,
+                    "description": "Relative time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Optional when start and end are provided. Supports s(seconds), m(minutes), h(hours), d(days)",
+                    "type": "string"
+                },
+                "start": {
+                    "description": "Absolute range start time. Optional; must be used together with end. Supports RFC3339 or Unix timestamp seconds/milliseconds",
+                    "type": "string"
+                },
+                "end": {
+                    "description": "Absolute range end time. Optional; must be used together with start. Supports RFC3339 or Unix timestamp seconds/milliseconds",
                     "type": "string"
                 }
             },

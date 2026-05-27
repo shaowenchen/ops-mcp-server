@@ -108,7 +108,9 @@ func (m *Module) buildQueryRangeToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
 		mcp.WithString("query", mcp.Required(), mcp.Description("PromQL query expression to execute")),
-		mcp.WithString("time_range", mcp.Required(), mcp.Description("Time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Supports s(seconds), m(minutes), h(hours), d(days)")),
+		mcp.WithString("time_range", mcp.Description("Relative time range for query (examples: 5m, 10m, 1h, 2h, 24h, 7d). Optional when start and end are provided. Supports s(seconds), m(minutes), h(hours), d(days)")),
+		mcp.WithString("start", mcp.Description("Absolute range start time. Optional; must be used together with end. Supports RFC3339 (e.g. 2026-05-27T14:00:00+08:00) or Unix timestamp seconds/milliseconds")),
+		mcp.WithString("end", mcp.Description("Absolute range end time. Optional; must be used together with start. Supports RFC3339 (e.g. 2026-05-27T15:00:00+08:00) or Unix timestamp seconds/milliseconds")),
 		mcp.WithString("step", mcp.Description("Query resolution step (default: 15s, examples: 15s, 30s, 60s, 1m, 5m). Supports s(seconds), m(minutes), h(hours)")),
 	)
 }
