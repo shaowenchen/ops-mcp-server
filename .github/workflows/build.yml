@@ -40,8 +40,13 @@ jobs:
           tags: docker.io/shaowenchen/ops-mcp-server:latest
           file: Dockerfile
           no-cache: true
+          # Attestation manifests use the OCI empty-descriptor config type
+          # (application/vnd.oci.empty.v1+json), which ACR rejects on push,
+          # breaking the skopeo --all copy below. Keep the index to real platforms only.
+          provenance: false
+          sbom: false
 
       - name: Push ops-mcp-server to aliyun
         run: |
           export image=ops-mcp-server
-          docker run --rm -v ~/.docker/config.json:/auth.json quay.io/skopeo/stable copy docker://shaowenchen/${image} docker://registry.cn-beijing.aliyuncs.com/opshub/shaowenchen-${image} --dest-authfile /auth.json --insecure-policy --src-tls-verify=false --dest-tls-verify=false --retry-times 5 --all
+          docker run --rm -v ~/.docker/config.json:/auth.json quay.io/skopeo/stable copy docker://shaowenchen/${image}:latest docker://registry.cn-beijing.aliyuncs.com/opshub/shaowenchen-${image}:latest --dest-authfile /auth.json --insecure-policy --src-tls-verify=false --dest-tls-verify=false --retry-times 5 --all
