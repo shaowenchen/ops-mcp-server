@@ -64,7 +64,7 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 
 	// Create HTTP client - each request uses a new connection, closes after request
 	transport := &http.Transport{
-		DisableKeepAlives:     true, // Disable connection reuse - close after each request
+		DisableKeepAlives: true, // Disable connection reuse - close after each request
 		DialContext: (&net.Dialer{
 			Timeout: 30 * time.Second,
 		}).DialContext,
@@ -935,27 +935,55 @@ func (m *Module) makeElasticsearchRequest(ctx context.Context, method, path stri
 func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
 
-	// Build query parameters
+	// Build query parameters. The tool keeps advertising "table", which _cat
+	// does not understand, so normalize it before sending. An unset format
+	// still returns structured JSON, matching the previous behaviour.
 	params := url.Values{}
+	requestedFormat := ""
 	if format, ok := args["format"].(string); ok && format != "" {
-		params.Add("format", format)
-	} else {
-		params.Add("format", "json")
+		requestedFormat = format
 	}
+	params.Add("format", normalizeCatFormat(requestedFormat))
 
 	if health, ok := args["health"].(string); ok && health != "" {
 		params.Add("health", health)
 	}
 
-	if status, ok := args["status"].(string); ok && status != "" {
-		params.Add("status", status)
+	// `status` is a _cat column, not an _cat/indices query parameter, so it
+	// cannot filter anything server-side. Map it onto expand_wildcards
+	// (7.0+) and filter the returned rows locally so the behaviour is the
+	// same on every supported version.
+	statusFilter := ""
+	if status, ok := args["status"].(string); ok {
+		statusFilter = strings.ToLower(strings.TrimSpace(status))
+	}
+	if statusFilter != "" {
+		var expandWildcards string
+		switch statusFilter {
+		case "open":
+			expandWildcards = "open"
+		case "close", "closed":
+			expandWildcards = "closed"
+			statusFilter = "close"
+		default:
+			statusFilter = ""
+		}
+		if expandWildcards != "" {
+			if version, known := m.clusterVersion(ctx); !known || version.supportsCatExpandWildcards() {
+				params.Add("expand_wildcards", expandWildcards)
+			}
+		}
 	}
 
-	// Add standard parameters
+	// Add standard parameters. `format` is handled above; _cat always wants
+	// the column list.
 	params.Add("h", "health,status,index,uuid,pri,rep,docs.count,docs.deleted,store.size,pri.store.size")
 	params.Add("s", "index")
 
 	path := "_cat/indices"
+	if indexPattern, ok := args["index"].(string); ok && strings.TrimSpace(indexPattern) != "" {
+		path += "/" + strings.TrimSpace(indexPattern)
+	}
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -1017,6 +1045,9 @@ func (m *Module) handleListIndices(ctx context.Context, request mcp.CallToolRequ
 					},
 				},
 			}, nil
+		}
+		if statusFilter != "" {
+			indices = filterIndicesByStatus(indices, statusFilter)
 		}
 		result = map[string]interface{}{
 			"indices": indices,
@@ -1307,20 +1338,40 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 		columnar = true
 	}
 
+	// ES|QL requires POST /_query; GET is rejected with 405 on every version
+	// that has the endpoint. Response format is a URL parameter (or Accept
+	// header) and is never part of the request body: the body parser rejects
+	// unknown fields.
+	path := "_query"
+	queryParams := url.Values{}
+	if format != "json" {
+		queryParams.Set("format", format)
+	}
+	if encoded := queryParams.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+
 	// Build ES|QL request
 	esqlRequest := map[string]interface{}{
 		"query": query,
 	}
-
-	if format != "json" {
-		esqlRequest["format"] = format
-	}
-
 	if columnar {
 		esqlRequest["columnar"] = true
 	}
 
-	resp, err := m.makeElasticsearchRequest(ctx, "GET", "_query", esqlRequest)
+	if version, known := m.clusterVersion(ctx); known && !version.supportsESQL() {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("ES|QL is not available on Elasticsearch %s: the _query endpoint requires 8.11 or later", version.Raw),
+				},
+			},
+		}, nil
+	}
+
+	resp, err := m.makeElasticsearchRequest(ctx, "POST", path, esqlRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -1336,6 +1387,19 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 	}
 
 	if resp.StatusCode >= 400 {
+		// A 400 "no handler found" means the cluster predates the ES|QL
+		// endpoint. Report that clearly instead of leaking the raw error.
+		if resp.StatusCode == http.StatusBadRequest && strings.Contains(string(responseData), "no handler found") {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{
+					mcp.TextContent{
+						Type: "text",
+						Text: "ES|QL is not available on this Elasticsearch cluster: the _query endpoint requires 8.11 or later",
+					},
+				},
+			}, nil
+		}
 		return nil, fmt.Errorf("elasticsearch ES|QL error (%d): %s", resp.StatusCode, string(responseData))
 	}
 
@@ -1347,22 +1411,14 @@ func (m *Module) handleESQL(ctx context.Context, request mcp.CallToolRequest) (*
 			return nil, fmt.Errorf("failed to parse ES|QL response: %w", err)
 		}
 
-		// Transform response into an array of objects (like Rust implementation)
-		// This makes the response much more user-friendly
-		objects := make([]map[string]interface{}, 0, len(esqlResponse.Values))
-		for _, row := range esqlResponse.Values {
-			obj := make(map[string]interface{})
-			for i, value := range row {
-				if i < len(esqlResponse.Columns) {
-					obj[esqlResponse.Columns[i].Name] = value
-				}
-			}
-			objects = append(objects, obj)
+		rows, err := esqlRows(esqlResponse, columnar)
+		if err != nil {
+			return nil, err
 		}
 
 		result = map[string]interface{}{
 			"columns": esqlResponse.Columns,
-			"data":    objects,
+			"data":    rows,
 			"meta":    esqlResponse.Meta,
 		}
 	} else {
@@ -1389,14 +1445,21 @@ func (m *Module) handleGetShards(ctx context.Context, request mcp.CallToolReques
 
 	// Build query parameters
 	params := url.Values{}
+	requestedFormat := ""
 	if format, ok := args["format"].(string); ok && format != "" {
-		params.Add("format", format)
-	} else {
-		params.Add("format", "json")
+		requestedFormat = format
 	}
+	params.Add("format", normalizeCatFormat(requestedFormat))
 
-	if state, ok := args["state"].(string); ok && state != "" {
-		params.Add("s", state)
+	// `s` sorts _cat output, it is not a filter. Collect the requested shard
+	// state and filter the rows locally instead.
+	stateFilter := ""
+	if state, ok := args["state"].(string); ok {
+		stateFilter = strings.TrimSpace(state)
+		if stateFilter != "" {
+			// Keep the same lightweight sort behaviour the tool had before.
+			params.Add("s", "state")
+		}
 	}
 
 	// Add standard parameters
@@ -1436,6 +1499,9 @@ func (m *Module) handleGetShards(ctx context.Context, request mcp.CallToolReques
 		var shards []ElasticsearchShard
 		if err := json.Unmarshal(responseData, &shards); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+		}
+		if stateFilter != "" {
+			shards = filterShardsByState(shards, stateFilter)
 		}
 		result = map[string]interface{}{
 			"shards": shards,

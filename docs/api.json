@@ -164,11 +164,15 @@
             "description": "List all available log indices in Elasticsearch",
             "parameters": {
                 "format": {
-                    "description": "Output format (table, json) - default: table",
+                    "description": "Output format (table, json) - default: json (structured)",
                     "type": "string"
                 },
                 "health": {
                     "description": "Filter by health status (green, yellow, red)",
+                    "type": "string"
+                },
+                "index": {
+                    "description": "Index name or pattern to limit the listing (optional, e.g. 'logs-*'). Recommended on clusters with many indices",
                     "type": "string"
                 },
                 "status": {

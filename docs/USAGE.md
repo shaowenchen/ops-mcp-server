@@ -629,9 +629,12 @@ List all available log indices in Elasticsearch.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `format` | string | No | Output format (table, json) - default: table |
+| `index` | string | No | Index name or pattern to limit the listing (e.g. `logs-*`). Recommended on clusters with many indices |
+| `format` | string | No | Output format (table, json) - default: json (structured) |
 | `health` | string | No | Filter by health status (green, yellow, red) |
 | `status` | string | No | Filter by status (open, close) |
+
+> `status` is applied as a local filter on the returned rows (mapped to `expand_wildcards` on 7.0+), so results are identical across Elasticsearch versions.
 
 **Example:**
 
@@ -686,6 +689,10 @@ Query logs using ES|QL (Elasticsearch Query Language).
 | `query` | string | ✅ Yes | ES\|QL query string |
 | `format` | string | No | Response format (json, csv, tsv, txt) - default: json |
 | `columnar` | string | No | Return results in columnar format (true or false) - default: false |
+
+> **Version requirement**: ES|QL requires Elasticsearch **8.11 or later** (generally available from 8.14). On older clusters this tool returns a clear "ES|QL is not available" error instead of a backend failure.
+>
+> `columnar: true` responses are transposed back into one object per row, so the `data` shape is the same whether or not columnar is requested.
 
 **Examples:**
 

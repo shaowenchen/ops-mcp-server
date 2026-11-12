@@ -100,7 +100,8 @@ func (m *Module) buildSearchToolDefinition(config ToolConfig) mcp.Tool {
 func (m *Module) buildListIndicesToolDefinition(config ToolConfig) mcp.Tool {
 	return mcp.NewTool(m.BuildToolName(config.Name),
 		mcp.WithDescription(config.Description),
-		mcp.WithString("format", mcp.Description("Output format (table, json) - default: table")),
+		mcp.WithString("index", mcp.Description("Index name or pattern to limit the listing (optional, e.g. 'logs-*'). Recommended on clusters with many indices")),
+		mcp.WithString("format", mcp.Description("Output format (table, json) - default: json (structured)")),
 		mcp.WithString("health", mcp.Description("Filter by health status (green, yellow, red)")),
 		mcp.WithString("status", mcp.Description("Filter by status (open, close)")),
 	)
