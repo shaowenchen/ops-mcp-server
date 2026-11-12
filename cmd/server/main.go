@@ -414,23 +414,23 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Initialize metrics system
 	metrics.Init(logger)
-	
+
 	// Set build info
 	versionInfo := version.Get()
 	metrics.SetBuildInfo(versionInfo.Version, versionInfo.GitCommit, versionInfo.BuildDate)
-	
+
 	// Set module enabled status
 	metrics.Get().SetModuleEnabled("sops", cfg.Sops.Enabled)
 	metrics.Get().SetModuleEnabled("events", cfg.Events.Enabled)
 	metrics.Get().SetModuleEnabled("metrics", cfg.Metrics.Enabled)
 	metrics.Get().SetModuleEnabled("logs", cfg.Logs.Enabled)
 	metrics.Get().SetModuleEnabled("traces", cfg.Traces.Enabled)
-	
+
 	// Start system metrics collector
 	metrics.StartSystemMetricsCollector(logger)
 
 	// Create MCP server
-	mcpServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
+	mcpServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion, server.WithRecovery())
 
 	// Register modules based on configuration
 	var toolCount int
@@ -520,6 +520,7 @@ func runServer(cmd *cobra.Command, args []string) {
 				Username: cfg.Metrics.Prometheus.Username,
 				Password: cfg.Metrics.Prometheus.Password,
 				Token:    cfg.Metrics.Prometheus.Token,
+				Timeout:  cfg.Metrics.Prometheus.Timeout,
 			}
 		}
 
@@ -801,7 +802,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			enabledModules := parseEnabledModules(r.URL.RawQuery)
 
 			// Create a new MCP server instance for this request
-			requestMCPServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion)
+			requestMCPServer := server.NewMCPServer("ops-mcp-server", version.BuildVersion, server.WithRecovery())
 
 			// Register modules based on query parameters
 			var toolCount int
@@ -865,6 +866,7 @@ func runServer(cmd *cobra.Command, args []string) {
 						Username: cfg.Metrics.Prometheus.Username,
 						Password: cfg.Metrics.Prometheus.Password,
 						Token:    cfg.Metrics.Prometheus.Token,
+						Timeout:  cfg.Metrics.Prometheus.Timeout,
 					}
 				}
 				metricsModuleInstance, err := metricsModule.New(metricsConfig, logger)
@@ -999,7 +1001,7 @@ func authMiddleware(expectedToken string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			
+
 			// Skip authentication if no token is configured
 			if expectedToken == "" {
 				metrics.RecordAuthRequest(true, true)

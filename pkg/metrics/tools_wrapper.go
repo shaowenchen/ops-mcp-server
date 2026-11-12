@@ -28,25 +28,56 @@ func WrapToolHandler(handler func(context.Context, mcp.CallToolRequest) (*mcp.Ca
 
 		// Record error if any (either handler returned error or result has IsError=true)
 		if err != nil || (result != nil && result.IsError) {
-			errorType := "unknown"
-			if err.Error() != "" {
-				// Try to categorize error
-				errStr := strings.ToLower(err.Error())
-				if strings.Contains(errStr, "not found") {
-					errorType = "not_found"
-				} else if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline") {
-					errorType = "timeout"
-				} else if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "forbidden") {
-					errorType = "auth_error"
-				} else if strings.Contains(errStr, "invalid") {
-					errorType = "invalid_input"
-				} else if strings.Contains(errStr, "connection") || strings.Contains(errStr, "network") {
-					errorType = "network_error"
-				}
+			// Prefer the returned error; fall back to the text content of an
+			// IsError result, which is how some modules report tool failures.
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			} else {
+				errMsg = errorTextFromResult(result)
 			}
-			RecordMCPToolError(toolName, moduleName, errorType)
+			RecordMCPToolError(toolName, moduleName, classifyError(errMsg))
 		}
 
 		return result, err
 	}
+}
+
+// errorTextFromResult extracts the text content of a tool result, which is how
+// handlers that return IsError=true with a nil error report what went wrong.
+func errorTextFromResult(result *mcp.CallToolResult) string {
+	if result == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for _, content := range result.Content {
+		switch c := content.(type) {
+		case mcp.TextContent:
+			sb.WriteString(c.Text)
+			sb.WriteString(" ")
+		case *mcp.TextContent:
+			sb.WriteString(c.Text)
+			sb.WriteString(" ")
+		}
+	}
+	return sb.String()
+}
+
+// classifyError maps an error message to a coarse error_type label.
+func classifyError(errMsg string) string {
+	errorType := "unknown"
+	errStr := strings.ToLower(errMsg)
+	switch {
+	case strings.Contains(errStr, "not found"):
+		errorType = "not_found"
+	case strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline"):
+		errorType = "timeout"
+	case strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "forbidden"):
+		errorType = "auth_error"
+	case strings.Contains(errStr, "invalid"):
+		errorType = "invalid_input"
+	case strings.Contains(errStr, "connection") || strings.Contains(errStr, "network"):
+		errorType = "network_error"
+	}
+	return errorType
 }

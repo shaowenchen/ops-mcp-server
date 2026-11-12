@@ -25,6 +25,7 @@ type PrometheusConfig struct {
 	Username string `mapstructure:"username" json:"username" yaml:"username"`
 	Password string `mapstructure:"password" json:"password" yaml:"password"`
 	Token    string `mapstructure:"token" json:"token" yaml:"token"`
+	Timeout  int    `mapstructure:"timeout" json:"timeout" yaml:"timeout"`
 }
 
 // ToolsConfig contains tools configuration
@@ -53,14 +54,20 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		return nil, fmt.Errorf("metrics config is required")
 	}
 
+	// Prometheus queries may take longer than the default; allow overriding.
+	timeout := 30 * time.Second
+	if config.Prometheus != nil && config.Prometheus.Timeout > 0 {
+		timeout = time.Duration(config.Prometheus.Timeout) * time.Second
+	}
+
 	// Create HTTP client - each request uses a new connection, closes after request
 	transport := &http.Transport{
-		DisableKeepAlives:     true, // Disable connection reuse - close after each request
+		DisableKeepAlives: true, // Disable connection reuse - close after each request
 		DialContext: (&net.Dialer{
 			Timeout: 10 * time.Second,
 		}).DialContext,
 		TLSHandshakeTimeout:   5 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
+		ResponseHeaderTimeout: timeout,
 	}
 
 	m := &Module{
@@ -68,13 +75,14 @@ func New(config *Config, logger *zap.Logger) (*Module, error) {
 		logger: logger.Named("metrics"),
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   30 * time.Second, // Prometheus queries timeout
+			Timeout:   timeout, // Prometheus queries timeout
 		},
 	}
 
 	if config.Prometheus != nil {
 		m.logger.Info("Metrics module created with Prometheus",
 			zap.String("prometheus_endpoint", config.Prometheus.Endpoint),
+			zap.Duration("timeout", timeout),
 		)
 	} else {
 		m.logger.Info("Metrics module created without Prometheus configuration")
@@ -130,7 +138,7 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 	start := time.Now()
 	resp, err := m.httpClient.Do(req)
 	duration := time.Since(start)
-	
+
 	if err != nil {
 		m.logger.Error("Prometheus Request Failed",
 			zap.String("method", method),
@@ -147,7 +155,7 @@ func (m *Module) makePrometheusRequest(ctx context.Context, method, path string,
 		}
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	
+
 	// Record backend metrics
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	appMetrics.RecordBackendRequest(appMetrics.BackendPrometheus, duration, success)
@@ -477,6 +485,17 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 	if stepArg, ok := args["step"].(string); ok && stepArg != "" {
 		step = stepArg
 	}
+	if d, err := parseTimeRange(step); err != nil || d <= 0 {
+		return nil, fmt.Errorf("invalid step %q: must be a positive duration (examples: 15s, 30s, 1m, 5m)", step)
+	}
+
+	// Absolute start/end take precedence over time_range.
+	if timeRange != "" && startArg != "" && endArg != "" {
+		m.logger.Warn("Both time_range and start/end provided; ignoring time_range",
+			zap.String("time_range", timeRange),
+			zap.String("start", startArg),
+			zap.String("end", endArg))
+	}
 
 	m.logger.Info("Executing PromQL range query",
 		zap.String("query", query),
@@ -513,19 +532,22 @@ func (m *Module) handleExecuteRangeQuery(ctx context.Context, request mcp.CallTo
 	}
 
 	// Convert to our response format
+	metadata := map[string]string{
+		"query":      query,
+		"type":       "range",
+		"start_time": start.Format(time.RFC3339),
+		"end_time":   end.Format(time.RFC3339),
+		"step":       step,
+	}
+	if timeRange != "" {
+		metadata["time_range"] = timeRange
+	}
 	response := MetricsQueryResponse{
 		Status:   promResp.Status,
 		Data:     promResp.Data,
 		Error:    promResp.Error,
 		Warnings: promResp.Warnings,
-		Metadata: map[string]string{
-			"query":      query,
-			"type":       "range",
-			"time_range": timeRange,
-			"start_time": start.Format(time.RFC3339),
-			"end_time":   end.Format(time.RFC3339),
-			"step":       step,
-		},
+		Metadata: metadata,
 	}
 
 	data, err := json.Marshal(response)
@@ -585,10 +607,8 @@ func parseQueryTime(value string) (time.Time, error) {
 	if value == "" {
 		return time.Time{}, fmt.Errorf("time cannot be empty")
 	}
+	// RFC3339Nano also accepts plain RFC3339 input.
 	if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
-		return t, nil
-	}
-	if t, err := time.Parse(time.RFC3339, value); err == nil {
 		return t, nil
 	}
 	ts, err := strconv.ParseInt(value, 10, 64)
